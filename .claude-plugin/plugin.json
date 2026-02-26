@@ -1,0 +1,14 @@
+{
+  "name": "ouroboros",
+  "version": "0.1.0",
+  "description": "A meta-plugin that researches, generates, absorbs, and evolves Claude Code plugins",
+  "author": {
+    "name": "kibum.park"
+  },
+  "repository": "https://github.com/kibum/ouroboros",
+  "license": "MIT",
+  "keywords": [
+    "meta-plugin", "plugin-generator", "compound-growth",
+    "co-evolution", "self-improvement", "modular-monolith"
+  ]
+}

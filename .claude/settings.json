@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Task",
+      "Skill",
+      "Bash(bash */ouroboros/scripts/*)",
+      "Bash(git worktree *)",
+      "Bash(git diff *)",
+      "Bash(git merge *)",
+      "Bash(git branch *)",
+      "Bash(git log *)",
+      "Bash(git status*)",
+      "Bash(git rev-parse *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)",
+      "Bash(git remote *)",
+      "Bash(gh *)",
+      "Bash(which codex *)",
+      "Bash(which gemini *)",
+      "Bash(codex *)",
+      "Bash(gemini *)",
+      "Bash(trash *)",
+      "Bash(mkdir -p .tmp*)",
+      "Bash(mkdir -p .swe*)",
+      "Bash(mkdir -p .worktrees*)"
+    ],
+    "deny": [
+      "Bash(rm *)",
+      "Bash(sudo *)",
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)"
+    ]
+  }
+}

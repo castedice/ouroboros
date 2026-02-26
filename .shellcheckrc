@@ -1,0 +1,5 @@
+# shellcheck configuration for ouroboros plugin
+# https://www.shellcheck.net/wiki/
+
+# SC2016: backticks in single quotes — we use literal backticks in sed patterns
+disable=SC2016

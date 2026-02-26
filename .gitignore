@@ -1,0 +1,18 @@
+# Ouroboros working directories
+.worktrees/
+.tmp/
+.trash/
+
+# SWE pipeline artifacts (generated during /swe spiral runs)
+.swe/
+
+# OS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Cache
+.rumdl_cache/

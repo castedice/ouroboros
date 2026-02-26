@@ -1,0 +1,10 @@
+# rumdl configuration for ouroboros plugin
+# Our markdown files are AI prompts/instructions, not prose documentation.
+
+[global]
+# MD013: line length — prompt files are read by AI, not terminals
+# MD033: inline HTML — we use <placeholder> syntax in argument-hint
+# MD036: emphasis as heading — SKILL.md motto pattern (*"Quote"*) is intentional
+# MD041: first line h1 — agents/templates start with YAML frontmatter
+# MD056: table column count — templates use | in placeholders (e.g., ${A | B | C})
+disable = ["MD013", "MD033", "MD036", "MD041", "MD056"]
