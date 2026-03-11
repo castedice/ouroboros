@@ -1,6 +1,6 @@
 ---
 description: Create a new plugin module or add a component to an existing module — design, generate, validate quality, and scaffold into the codebase
-argument-hint: <module-name> "<description>" | <module>/<component-name> "<description>" [--type <command|agent|skill|template>] [--reference <module>] [--multi]
+argument-hint: <module-name> "<description>" | <module>/<component-name> "<description>" [--type <command|agent|skill|template>] [--reference <module>] [--single]
 allowed-tools: Read, Glob, Grep, Write, Bash, Task
 ---
 
@@ -12,11 +12,11 @@ Target: $ARGUMENTS
 
 ## Agents Used
 
-| Phase | Agent | Mode | Role |
-|-------|-------|------|------|
-| 3 | generator + Bash background (--multi) | A | Module spec generation (Procedure 1), parallel with Codex generator when --multi |
-| 3 | generator + Bash background (--multi) | B | Component spec generation (Procedure 3), parallel with Codex generator when --multi |
-| 6 | evaluator, generator + Bash background (--multi) | A+B | Quality gate — validate + retry (parallel evaluator with Codex when --multi). See [procedure reference](../../skills/core/validation/references/quality-gate-procedure.md) |
+| Phase | Agent | Role |
+|-------|-------|------|
+| 3 | generator + Bash background (--multi) | Module spec (Procedure 1, Mode A) or component spec (Procedure 3, Mode B); parallel with Codex when --multi |
+| 5.5 | — (command) | Structural validation + inter-component consistency + auto-fix |
+| 6 | evaluator, generator + Bash background (--multi) | Quality gate — validate + retry. See [procedure reference](../../skills/core/validation/references/quality-gate-procedure.md) |
 
 ## Phase 1: Parse Input
 
@@ -36,7 +36,7 @@ Extract arguments from $ARGUMENTS:
 | `--type` | Mode B only | Component type: `command`, `agent`, `skill`, `template` (default: inferred from description) |
 | `--capabilities` | Mode A only | Comma-separated list of desired capabilities |
 | `--reference` | No | Reference module to pattern-match (default: `core`) |
-| `--multi` | No | Enable multi-model generation in Phase 3 (Claude + Codex parallel generator, cherry-pick merge) and Phase 6 (Claude + Codex parallel evaluator, consensus) |
+| `--single` | No | Force single-model mode (skip external CLIs). By default, multi-model is auto-detected — if codex CLI is installed, Codex runs in parallel for generation (Phase 3) and evaluation (Phase 6) |
 
 ### Mode Detection
 
@@ -72,56 +72,34 @@ Log parsed input, detected mode, and proceed.
 
 ## Phase 2: Context Gathering
 
-Collect all inputs the generator agent needs. Steps vary by mode.
+Collect all inputs the generator agent needs.
 
-### 2a: Module Context (Mode B) / Knowledge Base Scan (Mode A+B)
+### 2a: Target Analysis + Knowledge Base
 
-**Mode B — Existing Module Analysis:**
+1. **Target module analysis:**
 
-1. Scan the target module:
-   - `Glob: commands/{module}/*.md`
-   - `Glob: agents/{module}/*.md`
-   - `Glob: skills/{module}/**/*.md`
-   - `Glob: templates/{module}/*.md`
-2. Read **all** existing components to extract patterns, conventions, and inter-component references
+   > **Mode B only:** Scan and read all existing components of the target module to extract patterns, conventions, and inter-component references: `Glob: commands/{module}/*.md`, `agents/{module}/*.md`, `skills/{module}/**/*.md`, `templates/{module}/*.md`
 
-**Both modes — Knowledge Base Scan:**
+2. **Knowledge base scan** (both modes):
+   - `Glob: docs/specs/knowledge/*.md` — list all knowledge entries
+   - Read frontmatter of each entry (title, tags)
+   - Identify entries relevant to the target domain by tag and title matching
+   - Read full content of relevant entries (up to 5 most relevant)
 
-1. `Glob: docs/knowledge/*.md` — list all knowledge entries
-2. Read frontmatter of each entry (title, tags)
-3. Identify entries relevant to the target domain by tag and title matching
-4. Read full content of relevant entries (up to 5 most relevant)
+### 2b: Reference Patterns
 
-### 2b: Reference Structure (Mode A) / Reference Components (Mode B)
+Gather structural references for generation:
 
-**Mode A — Reference Module Structure:**
+> **Mode A:** Scan the reference module (default: `core/`): `commands/{reference}/*.md`, `agents/{reference}/*.md`, `skills/{reference}/*.md`, `templates/{reference}/*.md`. Read 1-2 representative files from each component type to capture patterns.
 
-1. Scan the reference module (default: `core/`):
-   - `Glob: commands/{reference}/*.md`
-   - `Glob: agents/{reference}/*.md`
-   - `Glob: skills/{reference}/*.md`
-   - `Glob: templates/{reference}/*.md`
-2. Read 1-2 representative files from each component type to capture patterns
-
-**Mode B — Same-Type Reference Components:**
-
-1. Identify 1-2 existing components of the **same type** as the target component
-   - Prefer components from the same module first, then from `core/`
-2. Read them fully as structural references for the generator
+> **Mode B:** Identify 1-2 existing components of the **same type** as the target component (prefer same module first, then `core/`). Read them fully as structural references.
 
 ### 2c: Evaluation Criteria
 
 Read the criteria reference for the target component type(s):
 
-**Mode A:** Read all applicable criteria:
-
-- `skills/core/evaluation/references/command-criteria.md`
-- `skills/core/evaluation/references/agent-criteria.md`
-- `skills/core/evaluation/references/skill-criteria.md`
-
-**Mode B:** Read only the criteria for the target type:
-
-- `skills/core/evaluation/references/{type}-criteria.md`
+- **Mode A**: Read all applicable: `skills/core/evaluation/references/{command,agent,skill}-criteria.md`
+- **Mode B**: Read only the target type: `skills/core/evaluation/references/{type}-criteria.md`
 
 ### 2d: Scaffold Template (Mode A only)
 
@@ -148,8 +126,11 @@ Generation runs Claude generator for deep knowledge-base-integrated content crea
    ```
 
    **Section 2 — Content**: All Phase 2 context verbatim:
-   - Mode A: module spec (name, description, capabilities) + reference module patterns + relevant knowledge entries + scaffold template
-   - Mode B: component spec (module, name, description, type) + existing module components + same-type reference components + relevant knowledge entries
+
+   | Mode | Content |
+   |------|---------|
+   | A | Module spec (name, description, capabilities) + reference module patterns + relevant knowledge entries + scaffold template |
+   | B | Component spec (module, name, description, type) + existing module components + same-type reference components + relevant knowledge entries |
 
    **Section 3 — Criteria**: Raw criteria reference content (`skills/core/evaluation/references/{type}-criteria.md`, verbatim). For Mode A, include all applicable criteria (command, agent, skill).
 
@@ -188,7 +169,7 @@ Generation runs Claude generator for deep knowledge-base-integrated content crea
    ```
 
 2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_generator_relay.txt .tmp/{SESSION_ID}_codex_gen.json high, run_in_background=true)`
+   - **Background**: `Bash(invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_generator_relay.txt .tmp/{SESSION_ID}_codex_gen.json high, run_in_background=true)`
    - **Foreground**: Launch Claude **generator** agent (via Task tool) with all Phase 2 context
 
 3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
@@ -202,42 +183,18 @@ Generation runs Claude generator for deep knowledge-base-integrated content crea
 
 ### When `--multi` is not active (single-model):
 
-### Mode A: Module Spec Generation
+Launch the **generator** agent via Task tool with all context gathered in Phase 2:
 
-Launch the **generator** agent via Task tool:
+| | Mode A (Procedure 1) | Mode B (Procedure 3) |
+|---|---|---|
+| **Input** | Module spec (name, domain, capabilities) + reference module patterns + knowledge entries + criteria + scaffold template | Component spec (module, name, description, type) + existing module components + same-type reference components + knowledge entries + criteria |
+| **Instructions** | "Perform Module Generation (Procedure 1). Analyze reference patterns, design module architecture, generate all component file contents. Output a complete Module Spec with manifest, rationale, and file contents." | "Perform Component Generation (Procedure 3). Analyze existing module patterns, generate a single component that integrates seamlessly. Output a Component Spec with path, rationale, and file content." |
+| **Expected output** | Module Spec (manifest + rationale + all file contents) | Component Spec (path + rationale + file content) |
 
-- **Input**: All context gathered in Phase 2:
-  - Module spec: name, domain description, capabilities
-  - Reference module patterns (representative files)
-  - Relevant knowledge entries
-  - Evaluation criteria for each component type
-  - Scaffold template
-- **Instructions**: "Perform Module Generation (Procedure 1). Analyze reference patterns, design module architecture, generate all component file contents. Output a complete Module Spec with manifest, rationale, and file contents."
-- **Expected output**: Module Spec (component manifest + rationale + all file contents)
+Parse the output:
 
-Parse the Module Spec output:
-
-1. Extract the component manifest (list of files to create)
-2. Extract each file's content
-3. Extract the Module README content
-
-### Mode B: Component Spec Generation
-
-Launch the **generator** agent via Task tool:
-
-- **Input**: All context gathered in Phase 2:
-  - Component spec: module name, component name, description, type
-  - Existing module components (all files — for pattern extraction)
-  - Same-type reference components (1-2 structural models)
-  - Relevant knowledge entries
-  - Evaluation criteria for the target component type
-- **Instructions**: "Perform Component Generation (Procedure 3). Analyze existing module patterns, generate a single component that integrates seamlessly. Output a Component Spec with path, rationale, and file content."
-- **Expected output**: Component Spec (path + rationale + file content)
-
-Parse the Component Spec output:
-
-1. Extract the file path
-2. Extract the file content
+- **Mode A**: Extract component manifest, each file's content, and Module README content
+- **Mode B**: Extract the file path and file content
 
 ## Phase 4: Worktree Setup
 
@@ -268,9 +225,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree.sh prune
 
 Create an isolated worktree for the generation target:
 
-1. Derive slug:
-   - Mode A: `{module-name}`
-   - Mode B: `{module}-{component-name}`
+1. Derive slug: Mode A → `{module-name}`, Mode B → `{module}-{component-name}`
 2. Create worktree:
 
    ```bash
@@ -312,6 +267,57 @@ Log: "{N} files written to worktree."
 
 Log: "1 file written to worktree: {component-path}"
 
+## Phase 5.5: Structural Validation & Auto-Fix
+
+> Validates generated files for structural correctness and inter-component consistency before quality evaluation.
+
+Apply the validation-methodology skill (`skills/core/validation/SKILL.md`) to each file written in Phase 5:
+
+### Step 1: Type-Specific Validation
+
+For each generated file in the worktree, run the validation workflow (Steps 1-4):
+
+1. **Identify component type** from file location and frontmatter
+2. **Run type-specific checks** per `skills/core/validation/references/frontmatter-and-fields.md`
+3. **Run cross-cutting checks** per `skills/core/validation/references/naming-and-collision.md`
+4. **Check common pitfalls** per `skills/core/validation/references/common-pitfalls.md`
+
+### Step 2: Inter-Component Consistency
+
+Validate references between generated components and existing module components:
+
+| Check | Condition | Validation |
+|-------|-----------|------------|
+| Agent → Skill reference | Agent was generated or exists in module | Agent's Read instructions or procedure steps reference the correct skill path (`skills/{module}/{skill-name}.md`) |
+| Command → Agent invocation | Command was generated or exists in module | Command's agent delegation uses the correct agent name matching `agents/{module}/{agent-name}.md` |
+| Skill → Reference files | Skill was generated | All files listed in skill's `references/` directory paths exist (or are being generated in the same batch) |
+
+For each failed check: log as error with the specific mismatched reference and expected value.
+
+### Step 3: Auto-Fix Errors
+
+For each error found (Steps 1-2), attempt automatic repair via Edit tool on the worktree file:
+
+| Error Type | Auto-Fix Action |
+|------------|----------------|
+| Missing required frontmatter field | Add field with appropriate default value |
+| Command name collision with built-in | Add `name: {module}:{command}` override in frontmatter |
+| `../` path traversal | Replace with `./` relative path |
+| Absolute filesystem path | Convert to relative path from plugin root |
+| Missing `color` in agent | Add `color` field with contextually appropriate value |
+| Incorrect agent/skill/reference path | Fix to correct path based on module structure |
+
+Errors not in this table: log as warning, do not attempt fix.
+
+### Step 4: Re-Validate (if fixes applied)
+
+If any auto-fixes were applied in Step 3, re-run validation (Steps 1-2) on the fixed files to confirm resolution. Skip if no fixes were applied.
+
+### Step 5: Report
+
+- **PASS** (0 errors after fixes): Log "Structural validation: PASS ({n} auto-fixed, {m} warnings)" → proceed to Phase 6
+- **FAIL** (residual errors): Log "⚠ Structural validation: {n} residual errors ({k} auto-fixed, {m} warnings). Proceeding to quality gate." → proceed to Phase 6. Store report for Phase 8
+
 ## Phase 6: Quality Validation
 
 > Agent: **evaluator**, **generator** (on retry) + Bash background (when `--multi`)
@@ -324,7 +330,7 @@ For each generated command, agent, and skill (templates excluded):
 
 1. **Build relay prompt**: Construct Mode A static evaluation prompt from component content + criteria reference. Save to `.tmp/{SESSION_ID}_relay.txt`
 2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh, run_in_background=true)`
+   - **Background**: `Bash(invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh, run_in_background=true)`
    - **Foreground**: Launch Claude **evaluator** agent (via Task tool) for static evaluation
 3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
 4. **Consensus**: Apply per-criterion majority rule (same as `evaluate.md` Phase 5.5). Consensus score determines pass/fail
@@ -335,9 +341,7 @@ Quality gate threshold remains Level >= 2 (same as single-model). On failure, re
 
 ### When `--multi` is not active (single-model):
 
-**Mode A:** Evaluate each command, agent, and skill in the manifest (templates excluded).
-
-**Mode B:** Evaluate the single generated component.
+Evaluate each generated command, agent, and skill (templates excluded). Mode A evaluates all manifest components; Mode B evaluates the single component.
 
 Apply the Quality Gate Procedure as defined.
 
@@ -345,17 +349,14 @@ Log quality validation results and proceed to Phase 7.
 
 ## Phase 7: Record Decision
 
-Create a generate decision entry in the worktree:
+Create a generate decision entry in the worktree using template from `templates/core/decision-generate.md`:
 
-- Mode A: `.worktrees/generate-{target}/docs/decisions/{date}-generate-{module-name}.md`
-- Mode B: `.worktrees/generate-{target}/docs/decisions/{date}-generate-{module}-{component-name}.md`
-
-Use template from `templates/core/decision-generate.md`.
+- **Path**: Mode A → `docs/decisions/{date}-generate-{module-name}.md`, Mode B → `docs/decisions/{date}-generate-{module}-{component-name}.md`
+- **target-display**: Mode A → `{module-name}`, Mode B → `{module}/{component-name}`
 
 Entry must include:
 
-- type: generate
-- mode: module | component
+- type: generate, mode: module | component
 - date, module, component (Mode B), type (Mode B), intent
 - evaluation-summary (pass/fail counts and scores)
 - Background (why the module/component was created)
@@ -363,7 +364,7 @@ Entry must include:
 - Generated Components table (all files with types and scores)
 - Verification results
 
-Stage and commit in worktree (`{target-display}` is `{module-name}` for Mode A, `{module}/{component-name}` for Mode B):
+Stage and commit in worktree:
 
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree.sh commit "$WORKTREE" "Generate {mode}: {target-display}"
@@ -389,6 +390,21 @@ Present the generation results for user review:
 | ... | ... | ... | ... |
 
 **Quality**: {pass-count}/{total} passed (>= 3/5)
+
+{If Phase 5.5 applied fixes or has residual errors:}
+### Structural Validation
+
+**Result**: {PASS|FAIL} ({n} auto-fixed, {k} residual errors, {m} warnings)
+
+{If auto-fixed:}
+| # | File | Fix Applied |
+|---|------|-------------|
+| 1 | `{path}` | {description of fix} |
+
+{If residual errors:}
+| # | File | Error | Manual Fix Needed |
+|---|------|-------|-------------------|
+| 1 | `{path}` | {error} | {fix instruction} |
 
 ### Diff
 

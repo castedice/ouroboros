@@ -51,22 +51,19 @@ Use when speed matters more than perfect agreement. Suitable for routine evaluat
 Step 1: Independent Scoring
   - Claude evaluator scores via Task tool (existing flow, always runs first)
   - Codex scores via Bash relay prompt
-  - (If available) Gemini scores via Bash relay prompt
   - No model sees any other model's results
 
 Step 2: Score Alignment
   For each criterion (C1-C5):
-    Count models that scored 0 and models that scored 1
-    If all agree → "unanimous" (high confidence)
-    If majority agrees → "majority" (medium confidence)
-    If tied (only possible with 2 models) → "split" (low confidence)
+    Compare Claude score vs Codex score
+    If both agree → "unanimous" (high confidence)
+    If they disagree → "split" (low confidence)
 
 Step 3: Divergence Analysis
   For each non-unanimous criterion:
     - Extract reasoning from each model
     - Identify the substantive disagreement
-    - Apply majority rule for final score
-    - If 2-model split: use Claude's score as tiebreaker, flag in report
+    - Use Claude's score as the final score on splits, flag in report
 
 Step 4: Self-Enhancement Bias Check
   For each criterion where Claude scored 1 and ALL external models scored 0:
@@ -88,15 +85,14 @@ Use for high-stake decisions where all models must agree. Trades speed for confi
 Step 1-2: Same as Majority Rule (independent scoring + alignment)
 
 Step 3: Divergence Resolution Loop
-  For each non-unanimous criterion:
-    a. Identify the model(s) in the minority (largest gap from majority)
-    b. Share the majority's reasoning with the minority model:
-       "Other evaluators scored this criterion {0|1} because: {reasoning}.
+  For each split criterion:
+    a. Share Claude's reasoning with Codex:
+       "The other evaluator scored this criterion {0|1} because: {reasoning}.
         Do you maintain your score of {score}? Explain why."
-    c. If the minority model changes its score → unanimous reached
-    d. If the minority model maintains its score with new reasoning →
-       share this reasoning with majority models for reconsideration
-    e. Maximum 2 convergence iterations per criterion
+    b. If Codex changes its score → unanimous reached
+    c. If Codex maintains its score with new reasoning →
+       share this reasoning with Claude for reconsideration
+    d. Maximum 2 convergence iterations per criterion
 
 Step 4: Resolution
   - If unanimous after convergence: use the agreed score
@@ -142,7 +138,6 @@ Detection rule:
 ```text
 IF Claude.score[Cx] == 1
 AND Codex.score[Cx] == 0
-AND (Gemini.score[Cx] == 0 OR Gemini unavailable)
 THEN flag Cx as "potential self-enhancement bias"
 ```
 
@@ -161,11 +156,11 @@ Step 1: Apply standard Mode B consensus to BEFORE scores (per-criterion majority
 Step 2: Apply standard Mode B consensus to AFTER scores (per-criterion majority rule)
 Step 3: Verdict Consensus
   - Each model provides a verdict: improved | degraded | lateral
-  - Apply majority rule to verdicts (3-way vote)
-  - If 3-way split (each model gives different verdict): Claude tiebreaker
+  - If both agree → unanimous verdict
+  - If split: use Claude's verdict as tiebreaker, flag in report
 Step 4: Regression Consensus
   - Union of all models' regression findings
-  - A regression is confirmed if flagged by majority of models
+  - A regression is confirmed if flagged by either model
 Step 5: With --unanimous, apply convergence prompts to:
   - Non-unanimous per-criterion scores (same as standard unanimous path)
   - Non-unanimous verdict (share majority verdict + reasoning, ask minority to reconsider)
@@ -190,24 +185,23 @@ Combine the strongest aspects from each model's output into a unified result. Us
 ```text
 1. Collect all model outputs
 2. Claude identifies unique contributions from each model:
-   - What did Codex mention that others missed?
-   - What did Gemini articulate better than others?
+   - What did Codex mention that Claude missed?
    - What did Claude itself contribute uniquely?
 3. Synthesize a unified output preserving all unique insights
-4. Attribute contributions: "[from Codex]", "[from Gemini]", "[from Claude]"
+4. Attribute contributions: "[from Codex]", "[from Claude]"
 5. Highlight contradictions between models (if any) as open questions
 ```
 
 ### Report Format
 
 ```text
-**Synthesized from**: Claude + Codex [+ Gemini]
+**Synthesized from**: Claude + Codex
 **Unique contributions**: {model}: {n} insights, ...
 
 {Synthesized content with attribution markers}
 
 **Open contradictions**:
-- {Model A says X, Model B says Y — user should decide}
+- {Claude says X, Codex says Y — user should decide}
 ```
 
 ## Integration Mode Selection Guide

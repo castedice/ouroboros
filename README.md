@@ -31,6 +31,12 @@ That's it. The plugin includes project-scoped permissions (`.claude/settings.jso
 # Research an external plugin or methodology
 /research https://github.com/some/plugin
 
+# Reverse-engineer specs from existing code
+/swe reverse src/auth/
+
+# Check system health
+/doctor
+
 # Generate a new module
 /generate assistant "Personal assistant for Obsidian vault management"
 
@@ -42,7 +48,7 @@ That's it. The plugin includes project-scoped permissions (`.claude/settings.jso
 
 ### Core Module — Meta-Plugin Operations
 
-9 commands (5 primitives + 4 composites) for the plugin lifecycle:
+10 commands (5 primitives + 5 composites) for the plugin lifecycle:
 
 #### Primitives
 
@@ -62,10 +68,11 @@ That's it. The plugin includes project-scoped permissions (`.claude/settings.jso
 | `/upgrade` | Upgrade from upstream — fetch changes, reconcile with local customizations |
 | `/adopt` | Adopt ouroboros into a project — analyze codebase, generate AGENTS.md |
 | `/onboard` | Discover capabilities — list modules, commands, and recommended workflows |
+| `/doctor` | System health check — verify CLI tools, MCP servers, hooks, settings |
 
 ### SWE Module — Software Engineering Companion
 
-13 commands implementing an 8-stage disciplined pipeline: **Spec** (DDD) + **Dev** (TDD) + **Ship** (Review) + **Tune** (Feedback).
+14 commands implementing an 8-stage disciplined pipeline: **Spec** (DDD) + **Dev** (TDD) + **Ship** (Review) + **Tune** (Feedback).
 
 #### Stage Commands
 
@@ -89,17 +96,27 @@ That's it. The plugin includes project-scoped permissions (`.claude/settings.jso
 | `/swe ship` | Review | Security review, code review, deploy readiness |
 | `/swe tune` | Feedback | Evaluate, improve, retrospect — extract learnings |
 | `/swe spiral` | All | Full engineering cycle: spec + dev + ship + tune |
+| `/swe reverse` | 1-4 (reverse) | Derive specification artifacts from existing code |
 
 #### Depth System
 
 Every stage has a configurable depth level: **Skip**, **Light**, **Standard**, **Deep**. Depth is per-stage, not per-project — a bug fix might use Light/Understand + Standard/Test while a new service uses Deep/Design + Standard/Implement.
 
+Three **traversal policies** control how stages are traversed:
+
+- **probe** (default) — Light-first exploration with confidence-gated escalation
+- **linear** — execute all stages at specified depth
+- **team** — multi-agent pipelined execution (Director + Shaper/Builder/Critic)
+
 ```bash
-# Standard depth for everything (default)
-/swe spiral "Add user authentication"
+# Probe policy (default) — explore light, escalate if needed
+/swe spiral "Fix pagination bug"
 
 # Custom depth per composite
 /swe spiral "Add user authentication" --depth S:Deep D:Standard H:Light N:Light
+
+# Team policy — multi-agent parallel execution
+/swe spiral "New authentication service" --policy team
 ```
 
 ## Architecture
@@ -113,7 +130,9 @@ ouroboros/
 ├── templates/{core,swe}/         # Document templates
 ├── hooks/hooks.json              # Event-driven hooks (PostToolUse format check)
 ├── scripts/                      # Shell scripts (worktree, formatting, model invocation)
-├── CLAUDE.md                     # AI behavioral guidelines
+├── docs/specs/                   # Living project model + knowledge base
+├── CLAUDE.md                     # Claude Code behavioral guidelines
+├── AGENTS.md                     # Multi-model development guidelines
 └── README.md                     # This file
 ```
 
@@ -131,17 +150,18 @@ ouroboros/
 | analyst | swe | Requirements analysis, constraint enumeration, architecture design, interface contracts |
 | implementer | swe | TDD test writing, code implementation, verification, optimization |
 | reviewer | swe | Security review, 4-perspective code review |
+| bridge | swe | External model delegation via MCP (Codex) |
 
 ### Multi-Model Support
 
-Commands support `--multi` for cross-model evaluation consensus. When enabled, ouroboros invokes external models (Codex, Gemini) alongside Claude, then synthesizes results using majority-rule consensus. This mitigates self-evaluation bias.
+Commands support `--multi` for cross-model evaluation consensus. When enabled, ouroboros invokes Codex alongside Claude, then synthesizes results using majority-rule consensus. This mitigates self-evaluation bias.
 
 ```bash
 /evaluate commands/swe/spiral.md --multi
 /brainstorm "Architecture options for caching layer" --multi
 ```
 
-Requires [Codex CLI](https://github.com/openai/codex) and/or [Gemini CLI](https://github.com/google-gemini/gemini-cli) installed. Gracefully degrades if unavailable.
+Requires [Codex CLI](https://github.com/openai/codex) installed. Auto-detected; gracefully degrades if unavailable.
 
 ## Philosophy
 
@@ -157,9 +177,10 @@ Requires [Codex CLI](https://github.com/openai/codex) and/or [Gemini CLI](https:
 The `dev/` directory contains internal development documents (not required for using ouroboros):
 
 - `dev/VISION.md` — Architecture philosophy and module roadmap
-- `dev/DECISIONS.md` — Design decision log (DR-001 through DR-044)
+- `dev/DECISIONS.md` — Design decision log (DR-001 through DR-071)
 - `dev/PLAN.md` — Implementation roadmap with phase tracking
 - `dev/STATUS.md` — Session handover document
+- `AGENTS.md` — Shared development guidelines for all AI agents
 
 ## License
 

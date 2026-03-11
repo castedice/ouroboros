@@ -2,8 +2,8 @@
 # Session lifecycle manager for ouroboros --multi commands
 #
 # Actions:
-#   init    — 세션 ID 생성 + .tmp 디렉토리 확인. stdout: session ID
-#   cleanup <session-id> — 세션 temp 파일 정리
+#   init    — Generate session ID + ensure .tmp directory exists. stdout: session ID
+#   cleanup <session-id> — Clean up session temp files
 #
 # Usage:
 #   SESSION_ID=$(bash scripts/session.sh init)

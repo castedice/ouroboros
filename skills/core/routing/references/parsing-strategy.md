@@ -26,8 +26,8 @@ scripts/invoke-model.sh <provider> <model> <prompt-file> <output-file>
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| provider | CLI tool name | `codex`, `gemini` |
-| model | Model identifier | `gpt-5.2`, `gemini-3-flash-preview` |
+| provider | CLI tool name | `codex` |
+| model | Model identifier | `gpt-5.2`, `gpt-5.4` |
 | prompt-file | Relay prompt text file | `.tmp/a1b2c3d4_relay.txt` |
 | output-file | Parsed JSON destination | `.tmp/a1b2c3d4_codex_eval.json` |
 
@@ -69,30 +69,6 @@ jq -s 'map(select(.item?.type? == "agent_message")) | .[-1].item.text' -r
 - `type: "error"` — error message in `.message` field
 - `type: "turn.failed"` — fatal error in `.error.message` field
 
-### Gemini (mixed stdout/stderr)
-
-Raw output mixes log lines with a JSON response object.
-
-**Primary parse** — skip non-JSON prefix, extract `.response`, strip code fences:
-
-```bash
-awk '/^\{/{found=1} found{print}' | jq -r '.response' | sed 's/^```json//;s/^```$//'
-```
-
-**Fallback parse** — try direct JSON extraction (skip `.response` wrapper):
-
-```bash
-awk '/^\{/{found=1} found{print}' | jq -s '.[] | select(.criteria? or .response?) | ...'
-```
-
-**Known patterns**:
-
-- `Loaded cached credentials.` — log line prefix, always skip
-- `Error when talking to Gemini API` — error line, extract for classification
-- `{"session_id": "...", "response": "..."}` — normal response wrapper
-- `.response` value occasionally wrapped in ` ```json ``` ` — sed strip required
-- 429 retry messages — CLI retries automatically; may still produce valid response
-
 ## LLM Fallback Protocol
 
 When the script exits with code 1, the command (LLM) reads the raw output file directly.
@@ -128,7 +104,6 @@ Errors are classified from extracted error lines only — never from full output
 | timeout, DNS, ECONNREFUSED | NETWORK_ERROR | Skip model |
 
 **Codex error extraction**: `jq -r 'select(.type == "error" or .type == "turn.failed") | .message'`
-**Gemini error extraction**: `grep -m1 -E "^Error|ModelNotFoundError|AuthenticationError"`
 
 ## File Naming Convention
 
@@ -138,8 +113,6 @@ All temp files use session-scoped naming within the workspace `.tmp/` directory:
 .tmp/{SESSION_ID}_relay.txt          # Assembled relay prompt
 .tmp/{SESSION_ID}_codex_eval.json    # Parsed Codex result (if success)
 .tmp/{SESSION_ID}_codex_eval.json.raw  # Raw Codex CLI output (always)
-.tmp/{SESSION_ID}_gemini_eval.json   # Parsed Gemini result (if success)
-.tmp/{SESSION_ID}_gemini_eval.json.raw # Raw Gemini CLI output (always)
 ```
 
 Session ID: first segment of a UUID (`uuidgen | cut -d- -f1`), 8 hex characters.

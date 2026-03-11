@@ -1,0 +1,16 @@
+{
+  "go": {
+    "command": "gopls",
+    "args": ["serve"],
+    "extensionToLanguage": {
+      ".go": "go"
+    },
+    "initializationOptions": {
+      "analyses": {
+        "unusedparams": true,
+        "shadow": true
+      },
+      "staticcheck": true
+    }
+  }
+}

@@ -55,6 +55,20 @@ You design and produce plugin module components from specifications, reference p
 3. **Domain-appropriate**: Adapt component content to the target domain. A research module differs from a code-review module in procedures, not in structure
 4. **Output-only**: Return generated content as text in the conversation. The calling command handles all file I/O
 
+## Procedure Overview
+
+Procedures 1 and 3 follow a parallel flow for different scopes:
+
+| Step | Procedure 1 (Module) | Procedure 3 (Component) |
+|------|---------------------|------------------------|
+| Analyze | Reference module patterns | Existing target module patterns |
+| Design | Full architecture (inventory, agent strategy) | Single component (type, path, role) |
+| Generate | All components with quality targeting | One component with quality targeting |
+| Knowledge | Cross-reference knowledge base | — (covered by calling command) |
+| Output | Module Spec (manifest + all files) | Component Spec (path + one file) |
+
+Both procedures share the **Quality Targeting** step: read `docs/specs/knowledge/plugin-component-quality-patterns.md` for HIGH quality structure checklists and `skills/core/evaluation/references/{type}-criteria.md` for the criteria the component will be judged against. Target >= 3/5 on applicable criteria.
+
 ## Procedure 1: Module Generation
 
 > Called by `/generate` command. Input: module spec + reference patterns + knowledge entries + evaluation criteria + scaffold template.
@@ -84,16 +98,11 @@ Apply the minimum viable module rule: 1 command + agent strategy + README.
 
 ### Step 3: Generate Component Content
 
-For each component in the inventory, read the corresponding reference files:
-
-- **Quality patterns**: `Read: docs/knowledge/plugin-component-quality-patterns.md` — HIGH quality structure checklist for each component type
-- **Evaluation criteria**: `Read: skills/core/evaluation/references/{type}-criteria.md` — the criteria the component will be judged against
-
-Generate content that follows the HIGH quality patterns and targets >= 3/5 on the applicable criteria. Use the reference module (Step 1) as the primary structural model; use the quality patterns file as the checklist.
+For each component in the inventory, apply the **Quality Targeting** step (see Procedure Overview above). Use the reference module (Step 1) as the primary structural model; use the quality patterns file as the checklist.
 
 ### Step 4: Integrate Knowledge
 
-Cross-reference `docs/knowledge/` entries related to the module's domain:
+Cross-reference `docs/specs/knowledge/` entries related to the module's domain:
 
 1. Search for entries with relevant tags
 2. Extract applicable patterns, conventions, or methodologies
@@ -156,8 +165,7 @@ From the input (explicit `--type` or inferred from description):
 Produce the complete component file content following:
 
 - **Module conventions**: Match the patterns extracted in Step 1
-- **Type conventions**: Follow the quality patterns and criteria references (same as Procedure 1, Step 3)
-- **Evaluation criteria**: Pre-check against the criteria for this component type to target >= 3/5
+- **Quality targeting**: Apply the shared Quality Targeting step (see Procedure Overview above)
 - **Reference components**: Use the provided same-type reference components as structural models
 
 ### Step 4: Output Component Spec
@@ -316,7 +324,7 @@ Produce the complete AGENTS.md file content. Do not wrap in code fences — outp
 
 ### Missing or Incomplete Input
 
-- **No reference module found**: Fall back to the quality patterns file (`docs/knowledge/plugin-component-quality-patterns.md`) and criteria references. State in the rationale: "No reference module available; generated from quality patterns only"
+- **No reference module found**: Fall back to the quality patterns file (`docs/specs/knowledge/plugin-component-quality-patterns.md`) and criteria references. State in the rationale: "No reference module available; generated from quality patterns only"
 - **Incomplete module spec** (missing domain or capabilities): List the missing fields and request clarification from the calling command. Do not generate with assumptions about unstated capabilities
 - **Empty evaluation report** (Procedure 2): Cannot regenerate without feedback. Return error: "Evaluation report required for regeneration. Run /evaluate first"
 

@@ -282,97 +282,24 @@ When tests reveal interface design issues:
 
 Never silently compensate for upstream gaps with implementation assumptions.
 
-## Calibration: Good vs Bad Output
+## Calibration
 
-### Stage 5 (Test) — Bad Example
+See detailed Good/Bad examples at `skills/swe/methodology/references/calibration-examples.md` — Implementer section.
 
-> Input: Interface with a `search(query: &str) -> Vec<SearchResult>` method.
+**Key calibration principles**:
+- Bad: generic test names, weak assertions, over-implementation beyond test coverage
+- Good: behavior-based naming with AAA pattern, precise assertions, minimal code that passes tests
 
-```rust
-#[test]
-fn test_search() {
-    let engine = SearchEngine::new();
-    let results = engine.search("hello");
-    assert!(results.len() > 0);
-}
-```
+## Cross-Component Integration
 
-**Why bad**: Generic test name — not behavior-based (`test_search` says nothing about what behavior is tested). No AAA pattern separation. `assert!(len > 0)` is a weak assertion — does not verify actual behavior, any non-empty result passes. No edge cases tested (empty query, no matches, multiple matches). No error path testing. No Red phase validation documented. Single test cannot characterize the interface contract.
+The implementer agent operates within the SWE pipeline ecosystem:
 
-### Stage 5 (Test) — Good Example
-
-```rust
-#[test]
-fn test_search_when_query_matches_title_should_return_matching_documents() {
-    // Arrange
-    let engine = SearchEngine::new();
-    engine.index(Document::new("rust-guide", "# Rust Programming Guide\nLearn Rust..."));
-
-    // Act
-    let results = engine.search("Rust Programming");
-
-    // Assert
-    assert_eq!(results.len(), 1);
-    assert_eq!(results[0].document_id, "rust-guide");
-    assert!(results[0].score > 0.0);
-}
-
-#[test]
-fn test_search_when_no_match_should_return_empty() {
-    // Arrange
-    let engine = SearchEngine::new();
-    engine.index(Document::new("rust-guide", "# Rust Guide"));
-
-    // Act
-    let results = engine.search("python");
-
-    // Assert
-    assert!(results.is_empty());
-}
-```
-
-**Why good**: Behavior-based naming following the `test_<behavior>_when_<condition>_should_<expected>` convention. Clear AAA pattern with comments. Tests specific behavior with precise assertions (`assert_eq!` over `assert!`). Includes both positive case (match found) and negative case (no match). Each test is independent with its own setup. Verifiable and reproducible.
-
-### Stage 6 (Implement) — Bad Example
-
-> Input: Tests for basic search functionality.
-
-```rust
-impl SearchEngine {
-    pub fn search(&self, query: &str) -> Vec<SearchResult> {
-        // Full-text search with BM25 ranking, stemming,
-        // fuzzy matching, and result highlighting
-        let tokens = self.tokenize(query);
-        let stemmed = self.stem(&tokens);
-        let fuzzy_matches = self.fuzzy_search(&stemmed);
-        let ranked = self.bm25_rank(&fuzzy_matches);
-        let highlighted = self.highlight(&ranked, &tokens);
-        highlighted.into_iter().map(|h| h.into_result()).collect()
-    }
-}
-```
-
-**Why bad**: Over-implemented far beyond what tests require. Added BM25 ranking, stemming, fuzzy matching, and highlighting — none of which have test coverage. Violates "minimal code to pass tests" principle. Introduces untested code paths that may contain bugs. If these features are needed, they should be specified in Interface Contracts and tested in Stage 5 first.
-
-### Stage 6 (Implement) — Good Example
-
-```rust
-impl SearchEngine {
-    pub fn search(&self, query: &str) -> Vec<SearchResult> {
-        let query_lower = query.to_lowercase();
-        self.documents
-            .iter()
-            .filter(|doc| doc.content.to_lowercase().contains(&query_lower))
-            .map(|doc| SearchResult {
-                document_id: doc.id.clone(),
-                score: 1.0,
-            })
-            .collect()
-    }
-}
-```
-
-**Why good**: Minimal code that makes existing tests pass. Case-insensitive substring matching is the simplest approach that satisfies the test assertions. No features beyond what tests verify — no ranking, no stemming, no fuzzy matching. Simple, correct, and readable. Can be optimized later in Stage 8 if profiling shows need and the Constraint Profile has performance targets that require it.
+- **Invoked by**: `/swe test`, `/swe implement`, `/swe verify`, `/swe optimize` (primitives), `/swe dev` (composite), `/swe ship` (integration test), `/swe tune` (improve)
+- **Consumes artifacts from**: analyst agent (Interface Contracts, Architecture Spec, Constraint Profile)
+- **Produces artifacts for**: reviewer agent (source code → Code Review), core evaluator (source code → Evaluate)
+- **References**: `skills/swe/methodology/SKILL.md` (pipeline methodology)
+- **Instruction templates**: `skills/swe/methodology/references/agent-instructions.md` — Stages 5-8, Integration Test, Improve
+- **Artifact contracts**: `skills/swe/methodology/references/artifact-contracts.md` — defines required fields per stage and depth
 
 ## Scope Boundary
 

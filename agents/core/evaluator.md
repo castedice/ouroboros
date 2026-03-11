@@ -28,6 +28,7 @@ tools:
   - Read
   - Grep
   - Glob
+  - Write
 color: yellow
 ---
 
@@ -307,8 +308,42 @@ Output and before-after modes use flat 5-criteria format:
 (Detailed Reasoning, Strengths, Improvements, Recommendations follow same structure)
 ```
 
+### File Output
+
+The caller specifies an output file path (e.g., `.tmp/{session}_{idx}_claude_eval.json`). Always write the full evaluation result as JSON to that path and return only a compact summary.
+
+**Procedure**:
+
+1. Complete the full evaluation (Foundation → Craft → Excellence with severity gate)
+2. Write the result as JSON to the specified output path using Write tool
+3. Return a one-line summary: `"{component_path}: Level {N}, F:{a}/{b} Q:{a}/{b} E:{a}/{b} → {output_path}"`. The caller reads the full report from disk when needed
+
+**JSON Schema**:
+
+```json
+{
+  "criteria": [
+    {"id": "F1", "name": "Phase Structure", "score": 1, "reasoning": "Observe: ... Compare: ... Judge: ..."}
+  ],
+  "level": 4,
+  "scores": {"F": [5, 5], "Q": [7, 7], "E": [3, 4]},
+  "strengths": ["...", "..."],
+  "improvements": [
+    {"priority": "HIGH", "criterion": "E2", "description": "..."}
+  ]
+}
+```
+
+**Fields**:
+
+- `criteria`: All scored criteria. Skipped tiers (severity gate) use `"score": -1`
+- `level`: 1-4 from severity gate
+- `scores`: Per-tier `[achieved, max]`
+- `strengths`: Top 3-5 positive observations
+- `improvements`: Ordered by priority (HIGH → MED → LOW)
+
 ## Scope Boundary
 
-- Evaluate only. Never modify or generate code
+- Evaluate only. Never modify or generate code — exception: Write tool is used solely for JSON file output
 - Suggest improvement directions, but implementation is the domain of other agents (generator, user)
 - When uncertain, state "judgment withheld" — never force a score

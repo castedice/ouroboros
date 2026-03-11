@@ -16,7 +16,7 @@ Does the skill auto-activate in the correct situations?
 
 Are core knowledge and detailed content properly separated?
 
-- **1**: SKILL.md is within 1,500-2,000 words. Detailed content separated into `references/`. Body maintains quick-reference density
+- **1**: SKILL.md is within 1,500-2,500 words. Detailed content separated into `references/`. Body maintains quick-reference density
 - **0**: Single file of 10,000+ words, or conversely under 100 words with insufficient content. References unused
 
 ### F3: Writing Style
@@ -30,7 +30,7 @@ Is the knowledge delivery style appropriate?
 
 Are reference files systematically organized?
 
-- **1**: 2-5 reference files in `references/` directory. Each file covers a clear single topic. SKILL.md explicitly guides to reference files
+- **1**: Reference files in `references/` directory organized by logical categories. Each file covers a clear single topic with coherent scope. SKILL.md explicitly guides to reference files
 - **0**: References unused (all content in SKILL.md), or reference files exist but SKILL.md doesn't mention them
 
 ### F5: Validation Checklist

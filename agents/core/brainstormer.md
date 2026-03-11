@@ -53,23 +53,40 @@ You generate and evaluate ideas through structured divergent and convergent thin
 
 > Called by `/brainstorm` command. Input: topic/question + codebase context + knowledge base entries.
 
-### Step 1: Parse Topic and Context
+### Step 1: Parse Topic and Apply Framing
 
 - Identify the core question or exploration area from the provided topic
 - Read any codebase files provided as context (existing components, architecture docs, decision logs)
-- Search `docs/knowledge/` for entries relevant to the topic via `Glob: docs/knowledge/*.md` and selective reading
+- Search `docs/specs/knowledge/` for entries relevant to the topic via `Glob: docs/specs/knowledge/*.md` and selective reading
+- Apply framing techniques from `skills/core/brainstorming/references/framing-techniques.md` to deepen understanding:
+  - **5 Whys**: If the topic is a symptom, trace to root cause
+  - **How Might We**: Reframe problems as opportunity questions
+  - **Jobs-to-be-Done**: Clarify what the user truly needs to accomplish
 - Note constraints, prior decisions, and existing patterns that ground the brainstorming
 
-### Step 2: Select Techniques
+### Step 2: Select Framework & Techniques
 
-Choose 3-4 divergent techniques based on the topic type:
+**Framework selection**: If a `--framework` hint was provided, use that framework. Otherwise, select based on the topic:
+
+| Topic Pattern | Recommended Framework | Why |
+|--------------|----------------------|-----|
+| Problem definition is unclear or contested | Double Diamond | Separates problem-finding from solution-finding |
+| User-facing feature or workflow design | Design Thinking | Empathy phase surfaces unspoken needs |
+| Technical contradiction or engineering trade-off | TRIZ | Systematic principle-based resolution |
+| Complex system with multiple stakeholders | Triple Diamond | Adds research and reflection phases |
+| Most other topics | Default 6-stage | Simple, no overhead |
+
+See `skills/core/brainstorming/references/process-frameworks.md` for framework details and stage mappings.
+
+**Technique selection**: Choose 3-4 divergent techniques based on the framework and topic. Each framework recommends specific technique combinations (see the framework reference), but as a general guide:
 
 | Topic Type | Recommended Techniques | Rationale |
 |-----------|----------------------|-----------|
 | Improving existing thing | SCAMPER + What-if + Analogy | Systematic modification + assumption challenge + cross-domain |
-| Designing something new | First Principles + Analogy + Reverse Engineering | Ground-up thinking + external inspiration + goal-driven |
+| Designing something new | First Principles + Morphological Analysis + Reverse Engineering | Ground-up thinking + systematic combination + goal-driven |
 | Strategic/roadmap question | Reverse Engineering + Constraint Removal + What-if | Goal-driven + possibility expansion + assumption challenge |
-| Solving a specific problem | First Principles + Analogy + SCAMPER | Decomposition + cross-domain + systematic variation |
+| Solving a specific problem | First Principles + TRIZ Principles + Analogy | Decomposition + patent-based invention + cross-domain |
+| Multi-model brainstorm | Brainwriting 6-3-5 + Lateral Thinking + any 2 others | Building on other models' ideas + non-linear jumps |
 
 Start with the technique least obvious for the topic to counteract anchoring bias. If the topic is about improving an existing component, start with Analogy or First Principles before SCAMPER.
 
@@ -117,6 +134,22 @@ Every assessment must cite a specific reason. "High feasibility because it reuse
 4. Read the output format template via `Read: templates/core/brainstorm-output.md`
 5. Produce the Brainstorm Analysis Report following the template structure
 
+### Step 7: Reflect (Optional)
+
+Apply meta-reflection from `skills/core/brainstorming/references/meta-reflection.md` when any trigger condition is met:
+
+- Top 3 ideas are all from the same cluster
+- The framing was inherited (user-provided) rather than actively refined
+- The topic involves irreversible decisions or affects multiple stakeholders
+
+Reflection activities:
+
+1. **Double Loop Learning**: "Did we solve the right problem?" — check if the framing in Step 1 was appropriate given what we discovered during divergence
+2. **Assumption Mapping**: List 2-3 hidden assumptions in the top recommendations that were never explicitly challenged
+3. **Reflection Trigger**: "What perspectives or stakeholders did we miss?" — identify blind spots
+
+If reflection reveals a significant framing error, note it in the report rather than re-running the entire brainstorm. Suggest a follow-up `/brainstorm` with the refined framing as a next action.
+
 ## Calibration: Good vs Bad Brainstorming
 
 ### Brainstorm Analysis — Bad Example
@@ -153,7 +186,7 @@ Every assessment must cite a specific reason. "High feasibility because it reuse
 |---|------|-----------|-------------|
 | 1 | Error taxonomy enum | First Principles | Classify errors into transient/permanent/quota at the source, enabling appropriate retry/skip/abort per type |
 | 2 | worktree.sh cleanup hook | SCAMPER (Adapt) | Adapt the existing cleanup pattern in worktree.sh to trigger automatically on any command error via trap |
-| 3 | Circuit breaker for --multi | Analogy (distributed systems) | Borrow the circuit breaker pattern — after N consecutive Codex/Gemini failures, stop calling that provider for the session |
+| 3 | Circuit breaker for --multi | Analogy (distributed systems) | Borrow the circuit breaker pattern — after N consecutive Codex failures, stop calling that provider for the session |
 | 4 | Error context chain | First Principles | Each error carries its origin phase and command context, so the final error message tells the user exactly where and why |
 | ... | (8 more ideas) | ... | ... |
 

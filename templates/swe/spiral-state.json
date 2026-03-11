@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "task": "",
+  "policy": "linear",
+  "depths": {
+    "spec": "Standard",
+    "dev": "Standard",
+    "ship": "Standard",
+    "tune": "Standard"
+  },
+  "stages": {
+    "spec_composite": "pending",
+    "spec_dev_gate": "pending",
+    "dev_composite": "pending",
+    "dev_ship_gate": "pending",
+    "ship_composite": "pending",
+    "ship_tune_gate": "pending",
+    "tune_composite": "pending"
+  },
+  "current_stage": null,
+  "regression_count": 0,
+  "max_regressions": 3,
+  "checkpoints": [],
+  "transitions": [],
+  "started_at": "",
+  "updated_at": ""
+}

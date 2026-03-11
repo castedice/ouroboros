@@ -1,6 +1,6 @@
 ---
 description: "Development composite — orchestrate Stages 5-8 (Test, Implement, Verify, Optimize) to produce working code from interface contracts"
-argument-hint: "<task-description> [--depth <global|per-stage>] [--artifact <interface-contracts-path>]"
+argument-hint: "<task-description> [--fast] [--depth <global|per-stage>] [--artifact <interface-contracts-path>]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Task, Bash
 ---
 
@@ -26,8 +26,11 @@ Extract from $ARGUMENTS:
 | Parameter | Source | Default |
 |-----------|--------|---------|
 | `task` | Positional text (everything not a flag) | Required — abort if empty |
+| `--fast` | Shortcut for `--depth Light` with relaxed skip conditions | Off |
 | `--depth` | Depth specification | Standard (global) |
 | `--artifact` | Path to Interface Contracts (Stage 4 output) | None (auto-discovered) |
+
+**`--fast` mode**: Sets all stages to Light depth and enables relaxed skip conditions in each primitive stage. If both `--fast` and `--depth` are present, `--depth` takes precedence.
 
 `--depth` accepts two formats:
 
@@ -62,7 +65,8 @@ If no Interface Contracts artifact found:
 ## Phase 2: Depth Planning
 
 1. If `--depth` was provided, use parsed values
-2. If no `--depth`, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md` independently for each stage:
+2. If `--fast` was provided (and no `--depth`), set all stages to Light and enable `fast_mode=true` — skip depth matrix scoring entirely
+3. If neither, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md` independently for each stage:
    - Score 5 factors once (they apply to the task overall)
    - Apply stage-specific minimum depth triggers for each stage:
      - Test: Standard when customer-visible behavior changes
@@ -70,7 +74,7 @@ If no Interface Contracts artifact found:
      - Verify: Deep when rollback > 2 hours or compliance scope exists
      - Optimize: Standard when Constraint Profile contains Hard performance constraints
    - Apply escalation rules per stage
-3. Build Depth Plan:
+4. Build Depth Plan:
 
 ```text
 Depth Plan: T:{level} I:{level} V:{level} O:{level}
@@ -100,7 +104,7 @@ Execute the Test stage by delegating to the implementer agent:
 > Agent: **implementer**
 
 - **Input**: Task description + Interface Contracts content + upstream artifacts (Context Document for success criteria, Constraint Profile for performance thresholds, Architecture Spec for component structure) + existing test patterns (framework, naming convention, directory layout) + depth level for Test
-- **Instructions**: Same as `commands/swe/test.md` Phase 4 implementer instructions, at the planned depth. "Execute Procedure 1 (Test) at {depth} depth. Write tests using AAA pattern. Name tests descriptively: `test_<behavior>_when_<condition>_should_<expected>`. Ensure test independence — no shared mutable state between tests. Use the project's test framework: {framework}. Return test code files and a test inventory table."
+- **Instructions**: Follow the Stage 5 (Test) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth. Bind: framework={framework}.
 - **Expected output**: Test code (one or more files) + test inventory table
 
 1. Survey codebase for test patterns and detect test framework (same as test.md Phase 3)
@@ -132,7 +136,7 @@ Execute the Implement stage, passing the Test Suite forward:
 > Agent: **implementer**
 
 - **Input**: Task description + Test Suite content + Interface Contracts content + Architecture Spec context (module placement, naming, data model) + existing source code patterns + depth level for Implement + build system info + current test output (Red state baseline)
-- **Instructions**: Same as `commands/swe/implement.md` Phase 4 implementer instructions, at the planned depth. "Execute Procedure 2 (Implement) at {depth} depth. Make tests pass with minimal code. Maximum 3 Red-Green rounds. Follow Architecture Spec for structure. Use Result pattern for errors — return errors, do not throw exceptions. Return source code with Green state confirmation."
+- **Instructions**: Follow the Stage 6 (Implement) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Source code files + Green state confirmation (test runner output)
 
 1. Read the Test Suite artifact from Phase 3 output
@@ -168,7 +172,7 @@ Execute the Verify stage, passing the Implementation forward:
 > Agent: **implementer**
 
 - **Input**: Task description + full artifact chain content (Context Document, Constraint Profile, Architecture Spec, Interface Contracts, Test Suite, Implementation summary) + source code file paths + test baseline results + depth level for Verify
-- **Instructions**: Same as `commands/swe/verify.md` Phase 4 implementer instructions, at the planned depth. "Execute Procedure 3 (Verify) at {depth} depth. For each acceptance criterion from the Context Document, provide evidence of PASS or FAIL. Compare the implementation against the Architecture Spec for structural compliance. Run integration tests if applicable. Document deviations with rationale and impact assessment. Follow the template at `templates/swe/verification-report.md`. Return Verification Report content."
+- **Instructions**: Follow the Stage 7 (Verify) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth. Bind: build_status and exec_status from smoke test results.
 - **Expected output**: Verification Report content (acceptance criteria checklist, spec compliance, deviation documentation)
 
 1. Gather the full artifact chain from `.swe/active/` (same as verify.md Phase 3)
@@ -207,7 +211,7 @@ Execute the Optimize stage, passing the Verification Report forward:
 > Agent: **implementer**
 
 - **Input**: Source code file list + Constraint Profile content (performance constraints) + Architecture Spec content (algorithm rationale) + Verification Report + test baseline output + available profiling tools + depth level for Optimize
-- **Instructions**: Same as `commands/swe/optimize.md` Phase 4 implementer instructions, at the planned depth. "Execute Procedure 4 (Optimize) at {depth} depth. Profile implementation to identify actual bottlenecks. Prioritize against Constraint Profile performance targets: Hard constraint violations first, then Soft, then general code quality. Apply optimizations one at a time, running full test suite after each change. Measure before/after. Refactor for clarity after performance work. Follow the template at `templates/swe/optimization-report.md`. Return Optimization Report content."
+- **Instructions**: Follow the Stage 8 (Optimize) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Optimization Report content + modified source code
 
 1. Survey codebase for optimization candidates and identify profiling tools (same as optimize.md Phase 3)
@@ -289,6 +293,11 @@ Review the development artifacts, or approve to proceed.
 - `/swe verify "{task}"` — revisit verification
 - `/swe optimize "{task}"` — revisit optimization
 ```
+
+### See Also
+- **Implementer agent** (`agents/swe/implementer.md`) — executes all 4 development stages
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
+- **Artifact Contracts** (`skills/swe/methodology/references/artifact-contracts.md`) — stage input/output specifications
 
 ## Rules
 

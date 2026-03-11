@@ -117,6 +117,25 @@ Depth and coding style are orthogonal concerns:
 
 Depth is determined by the task. Coding style is determined by the project's `AGENTS.md` conventions. A Light-depth implementation still follows the project's coding standards; it just produces less documentation around the implementation.
 
+## Fast Mode (`--fast`)
+
+The `--fast` flag is syntactic sugar that sets `--depth Light` globally and enables **relaxed skip conditions** at primitive stages. It targets simple tasks where the 8-stage pipeline's full ceremony is overhead.
+
+### Relaxed Skip Conditions (fast mode only)
+
+| Stage | Fast Mode Skip Condition | Without Fast Mode |
+|-------|--------------------------|-------------------|
+| Understand | **Never skip** | Never skip |
+| Constrain | Single-file change with no external dependencies | Pure refactoring only |
+| Design | No structural decisions, existing patterns cover change | Implementation within existing architecture only |
+| Interface | Change within single module boundary | Internal refactoring only |
+| Test | **Never skip** | Configuration/docs only |
+| Implement | **Never skip** | Spec-only workflow |
+| Verify | All tests pass and change < 50 lines | Trivial change covered by unit tests |
+| Optimize | Default skip unless explicit perf concern | No performance requirements |
+
+**Precedence**: `--depth` always overrides `--fast`. When both are present, `--depth` wins.
+
 ## Override Rules
 
 The default from the decision matrix can be overridden in these situations:
@@ -147,7 +166,7 @@ Example: `Depth Plan: U:Std C:Std D:Deep I:Std T:Std M:Std V:Deep O:Light` — n
 
 When making depth decisions, consult past calibration data if available:
 
-1. Check `.swe/record/` for retrospect reports from previous turns on the same package
+1. Check `docs/specs/record/` for retrospect reports from previous turns on the same package
 2. Read the Depth Accuracy table from each retrospect — look for patterns of Over or Under calibration
 3. Adjust the current turn's depth plan based on observed patterns:
    - Repeated "Under" on a stage → raise minimum depth for that stage

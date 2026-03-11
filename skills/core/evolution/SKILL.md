@@ -63,7 +63,7 @@ The baseline is the anchor for all subsequent work. Without it, validation (Stag
 
 - Researcher agent performs root cause analysis on 0-score criteria
 - Root causes fall into three categories: **Missing**, **Format error**, or **Insufficient depth**
-- Search knowledge base (`docs/knowledge/`) for relevant patterns
+- Search knowledge base (`docs/specs/knowledge/`) for relevant patterns
 - Report improvement directions with priorities
 
 Root cause diagnosis prevents surface-level fixes. Example: if C2 (Progressive Disclosure) fails because word count is 484 (need 1,500+), the root cause is not "too few words" — it is "insufficient detail in stage descriptions and missing reference files." The fix targets content depth, not word count.

@@ -1,5 +1,17 @@
 # Brainstorm Analysis Output Format
 
+When used with `--output`, include this frontmatter at the top of the file:
+
+```yaml
+---
+topic: "{topic}"
+framework: "{framework used or 'default'}"
+date: "{YYYY-MM-DD}"
+tags: [{relevant tags}]
+models: ["{models used}"]
+---
+```
+
 ## Brainstorm Analysis: {topic}
 
 **Context summary**: {1-2 sentences on what was explored and what context was available}
@@ -10,7 +22,7 @@
 
 | # | Idea | Technique | Description |
 |---|------|-----------|-------------|
-| 1 | {idea name} | {SCAMPER/What-if/Analogy/First Principles/Constraint Removal/Reverse Engineering} | {one sentence} |
+| 1 | {idea name} | {technique name from divergent-techniques.md} | {one sentence} |
 | 2 | ... | ... | ... |
 
 ### Clusters

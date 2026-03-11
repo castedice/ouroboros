@@ -206,7 +206,7 @@ Deleted: `dev/HANDOVER.md` (superseded by STATUS.md), `dev/REVIEW.md` (absorbed 
 
 Absorb covers all external-to-internal flows regardless of fidelity (faithful copy vs inspired creation). Evolve covers all internal improvements regardless of origin (built-in, generated, absorbed).
 
-**Consequence:** "참고해서 만들어줘" and "흡수해줘" both route through `/absorb`. External plugin updates = re-absorb, not upgrade.
+**Consequence:** Both "create based on this reference" and "absorb this" route through `/absorb`. External plugin updates = re-absorb, not upgrade.
 
 ## DR-018: Stores — Knowledge, Decisions, Personal
 
@@ -293,7 +293,7 @@ External plugin updates → re-absorb (`/absorb` again with new version).
 
 **Rationale:**
 
-- "측정할 수 없으면 개선할 수 없다" — evaluate first
+- "You can't improve what you can't measure" — evaluate first
 - Milestone 2 (evaluate + evolve) enables ouroboros to improve its own dev module commands/agents
 - Existing dev module (9 commands, 10 agents) provides immediate material for the self-improvement cycle
 - Each subsequent command is quality-checked by `/evaluate` as it's built
@@ -356,7 +356,7 @@ External plugin updates → re-absorb (`/absorb` again with new version).
 
 5. **Researcher agent**: New core agent (`agents/core/researcher.md`). Read-only, opus model. Performs root cause analysis on evaluation results and searches knowledge base for applicable patterns.
 
-6. **Evolution skill**: `skills/core/evolution/SKILL.md` provides improvement prioritization methodology (0점 criteria > [HIGH] > [MED] > [LOW]) and bias mitigation strategies.
+6. **Evolution skill**: `skills/core/evolution/SKILL.md` provides improvement prioritization methodology (0-score criteria > [HIGH] > [MED] > [LOW]) and bias mitigation strategies.
 
 7. **Decision entries**: Evolve produces `docs/decisions/{date}-evolve-{name}.md` recording background, decisions, changes, and verification results.
 
@@ -744,7 +744,7 @@ Severity gate (SonarQube-inspired): Foundation failures cap maximum achievable l
 **Status:** active
 **Context:** Phase 4 Step 2. The default external model config for `--multi` evaluation was gpt-5.2 xhigh + Gemini auto, chosen theoretically. Needed empirical validation: does xhigh reasoning help? Can cheaper models maintain discrimination? Is Gemini useful for evaluation?
 
-**Experiment:** 48 invocations across 12 configs × 2 benchmarks (evaluate.md command, evaluator.md agent) × 2 runs. Includes supplementary round: gpt-5.3-codex medium/xhigh and gemini-3-pro-preview. Full results + qualitative analysis in `dev/experiments/model-optimization/`.
+**Experiment:** 48 invocations across 12 configs × 2 benchmarks (evaluate.md command, evaluator.md agent) × 2 runs. Includes supplementary round: gpt-5.3-codex medium/xhigh and gemini-3-pro-preview. Gemini 3.1 re-experiment (G6, 4 invocations) added 2026-02-28. Full results + qualitative analysis in `dev/experiments/model-optimization/`.
 
 **Key Findings:**
 
@@ -752,25 +752,26 @@ Severity gate (SonarQube-inspired): Foundation failures cap maximum achievable l
 2. **xhigh effort is consistently strict, not over-strict**: xhigh always scores E4=0 (consistent), while high/medium fluctuate between 0 and 1 across runs (non-deterministic on borderline criteria). Qualitative analysis of E4 reasoning shows both interpretations are valid — xhigh reads criteria literally ("placeholders are not context-populated"), high reads pragmatically ("placeholders intended to be populated at runtime"). Higher score ≠ better judgment.
 3. **gpt-5.3-codex matches gpt-5.2 discrimination at 1.5-2.6× speed**: Identical 0-score patterns across all effort levels. No coding-model bias detected in reasoning — references to "Bash commands" and "JSON schemas" reflect actual evaluate.md content, not model prejudice. E1/E2 reasoning is substantively identical between models.
 4. **Gemini (G1-G4) lacks discrimination entirely**: Systematic 16/16 scoring. Reasoning is factually incorrect — G1 calls evaluate.md a "pure orchestrator" and "extremely token-efficient" despite 35KB of inline implementation. Only gemini-3-pro-preview (G5) shows E1 discrimination with specific evidence ("Phase 5.5 embeds voting algorithms, convergence rules, bias detection").
-5. **gemini-3-pro-preview is the only viable Gemini**: E1=0 on evaluate.md with precise reasoning. However still lenient on E2 and evaluator. 429 capacity issues did not occur during experiment (previously chronic). Gemini 3.1 released 2026-02-20 — defer Gemini evaluation to when CLI supports 3.1.
-6. **C5 (spark) unsupported**: Requires ChatGPT Pro research preview access.
-7. **Parse stability**: Codex 100% (24/24 exit 0 across all configs). Gemini 87.5% (14/16; 1 parse failure, 1 non-standard format).
+5. **gemini-3-pro-preview is the only viable Gemini (pre-3.1)**: E1=0 on evaluate.md with precise reasoning. However still lenient on E2 and evaluator. 429 capacity issues did not occur during experiment (previously chronic).
+6. **gemini-3.1-pro-preview (G6, 2026-02-28) shows dramatic improvement**: E1=0 on evaluate.md 100% (2/2 runs, vs G5's 50%). E2=0 in 50% of runs (vs G5's 0%). Novel E3=0 finding with valid reasoning. Evidence-based, specific reasoning quality ("'which codex' availability checks", "uuidgen string manipulations"). Still lenient on evaluator.md (16/16 both runs). Viable as periodic spot-checker but E2 consistency insufficient for consensus participation.
+7. **C5 (spark) unsupported**: Requires ChatGPT Pro research preview access.
+8. **Parse stability**: Codex 100% (24/24 exit 0 across all configs). Gemini pre-3.1: 87.5% (14/16; 1 parse failure, 1 non-standard format). Gemini 3.1: 100% (4/4).
 
 **Decision:**
 
 - **Codex for evaluation**: `gpt-5.3-codex` with `xhigh` reasoning effort (was: gpt-5.2 xhigh). Same consistency but 2.6× faster (94s vs 249s). The coding model shows no bias disadvantage on non-code evaluation and delivers identical discrimination. xhigh provides deterministic judgment on borderline criteria — important for reproducible evaluation baselines.
-- **Gemini for evaluation**: excluded until Gemini 3.1 support in CLI. Current models (3-preview, 2.5-pro, 2.5-flash) lack discrimination on most criteria. Re-experiment when gemini-3.1-pro becomes available.
+- **Gemini for evaluation**: `gemini-3.1-pro-preview` viable as periodic spot-checker (was: excluded). E1 discrimination 100%, E2 50%, evidence-based reasoning. Not added to `--multi` consensus due to E2 inconsistency — use for quarterly spot-checks on sample components.
 - **Fast screening config**: `gpt-5.3-codex` with `medium` for regression suite bulk evaluation. Same E1/E2 discrimination, E4 fluctuates, 2× faster than xhigh (45s).
 
 **Alternatives Considered:**
 
 - **gpt-5.2 high (initial DR-035)**: Same accuracy as gpt-5.3-codex but 1.6× slower. Non-deterministic on E4. Qualitative reasoning analysis revealed that "higher score = better" assumption was flawed — xhigh's lower score reflects stricter but valid interpretation, not worse judgment.
 - **gpt-5.3-codex high**: Viable middle ground (65s, same E1/E2 accuracy). But E4 fluctuation makes it non-reproducible — undesirable for baselines.
-- **Keep Gemini as optional leniency cross-check**: Gemini's reasoning quality (factually incorrect on E1/E2) adds noise, not signal. Better to exclude until 3.1.
+- **Keep Gemini as optional leniency cross-check**: Pre-3.1 Gemini reasoning quality (factually incorrect on E1/E2) adds noise. 3.1 is viable for spot-checks but E2 inconsistency (50%) prevents consensus participation.
 
 **Methodology note:** "Higher overall score" does not indicate a better evaluator. Evaluation quality is measured by: (1) agreement with confirmed ground truth (E1=0, E2=0), (2) reasoning specificity (does it cite concrete evidence?), (3) consistency across runs, (4) factual accuracy of reasoning claims.
 
-**Consequence:** Default evaluation routing: `gpt-5.3-codex xhigh`. Regression/bulk: `gpt-5.3-codex medium`. Gemini excluded pending 3.1 CLI support. Update `routing-table.md` and `evaluate.md` accordingly.
+**Consequence:** Default evaluation routing: `gpt-5.3-codex xhigh`. Regression/bulk: `gpt-5.3-codex medium`. Gemini: `gemini-3.1-pro-preview` for periodic spot-checks (not consensus). Self-evaluation bias analysis: `dev/experiments/self-eval-bias/analysis.md`.
 
 ## DR-036: Agent Model Routing — Researcher, Generator & Reconciler Delegation
 
@@ -1107,9 +1108,9 @@ Key principles:
 
 **Date**: 2026-02-26
 **Status**: active
-**Context**: depth-system.md의 5-factor matrix가 depth를 결정하지만, 결정이 적절했는지 사후 검증 없음. tune retrospect에 Depth Accuracy 테이블이 있으나 Deep 전용이고, 수집 데이터를 다음 turn에 반영하는 경로 없음.
-**Decision**: (1) Depth Accuracy를 Standard+로 승격하여 대부분의 turn에서 수집. (2) tune agent가 stage별 Over/Under/Correct 판정. (3) depth-system.md에 cross-reference 추가하여 다음 turn의 Phase 2에서 record/ 내 과거 calibration 참조 가능하게. (4) 자동 조정은 하지 않음 — 데이터 수집 + 참조만 (사람이 판단).
-**Consequence**: 매 turn마다 calibration 데이터가 쌓여 depth 결정의 정확도를 추적 가능. 자동 조정은 충분한 데이터 축적 후 별도 설계.
+**Context**: The 5-factor matrix in depth-system.md determines depth, but there is no post-hoc verification of whether the decision was appropriate. The tune retrospect has a Depth Accuracy table, but it is Deep-only and there is no path to feed collected data into the next turn.
+**Decision**: (1) Promote Depth Accuracy to Standard+ so it is collected on most turns. (2) The tune agent judges Over/Under/Correct per stage. (3) Add cross-reference in depth-system.md so Phase 2 of the next turn can reference past calibration in record/. (4) No automatic adjustment — data collection and reference only (human decides).
+**Consequence**: Calibration data accumulates each turn, enabling tracking of depth decision accuracy. Automatic adjustment to be designed separately after sufficient data accumulation.
 
 ## DR-043: Core Module Lifecycle — Evaluation Persistence + Knowledge Entry Management
 
@@ -1123,7 +1124,555 @@ Key principles:
 
 **Date**: 2026-02-26
 **Status**: active
-**Context**: Red team audit에서 AI가 직접 `rm -f .tmp/*`을 실행할 때 settings.json 누락으로 permission 문제 발생. 시스템 `trash` 명령으로 전면 교체를 시도했으나: (1) 크로스 플랫폼 호환성 문제 (macOS: `trash`, Linux: `trash-put`/`gio trash`, Windows: 네이티브 없음), (2) macOS `~/.Trash/`는 SIP으로 CLI 접근 제한 (list/restore 불가).
-**Decision**: `scripts/safe-rm.sh`가 프로젝트 로컬 `.trash/` 디렉토리를 사용. (1) **delete**: 파일을 `.trash/{timestamp}_{filename}`으로 이동 (플랫폼 무관, 항상 복구 가능). (2) **list**: `.trash/` 내용 조회 (패턴 필터 지원). (3) **restore**: `.trash/`에서 원래 위치로 복구 (정확/퍼지 매칭). (4) **purge**: N일 이상 된 파일 영구 삭제 (기본 7일). 모든 스크립트(session.sh, invoke-model.sh, regression.sh)에서 `rm -f` 대신 `safe-rm.sh` 호출. settings.json에서 `Bash(rm *)` deny. `.trash/`는 `.gitignore`에 추가.
-**Consequence**: 모든 플랫폼에서 파일 삭제가 복구 가능. 외부 의존성 없음. 시스템 trash 권한 문제 회피. AI의 직접 rm 사용 차단.
+**Context**: During a red team audit, the AI directly executing `rm -f .tmp/*` caused permission issues due to missing settings.json entries. Attempted a full replacement with the system `trash` command, but: (1) cross-platform compatibility issues (macOS: `trash`, Linux: `trash-put`/`gio trash`, Windows: no native support), (2) macOS `~/.Trash/` is restricted by SIP for CLI access (list/restore not possible).
+**Decision**: `scripts/safe-rm.sh` uses a project-local `.trash/` directory. (1) **delete**: moves files to `.trash/{timestamp}_{filename}` (platform-independent, always recoverable). (2) **list**: lists `.trash/` contents (supports pattern filtering). (3) **restore**: restores from `.trash/` to original location (exact/fuzzy matching). (4) **purge**: permanently deletes files older than N days (default 7). All scripts (session.sh, invoke-model.sh, regression.sh) call `safe-rm.sh` instead of `rm -f`. `Bash(rm *)` deny in settings.json. `.trash/` added to `.gitignore`.
+**Consequence**: File deletion is recoverable on all platforms. No external dependencies. Avoids system trash permission issues. Blocks AI from using rm directly.
 
+## DR-045: Semantic Versioning — Retroactive Phase Mapping
+
+**Date**: 2026-02-26
+**Status**: active
+**Context**: While preparing for public release, there was no versioning system. Only 0.1.0 existed in plugin.json with no CHANGELOG or git tags. PLAN.md was also category-based (Backlog-X) with no connection to version targets.
+**Decision**: (1) **Retroactive versioning**: Map ROADMAP.md Phases to semver — Phase 0=0.1.0, Phase 1=0.2.0, Phase 2=0.3.0, Phase 3=0.4.0, Phase 4=0.5.0, Phase 5=0.6.0, Phase 5.5=0.7.0, Public Release=1.0.0. (2) **CHANGELOG.md**: Retroactive entries in Keep a Changelog format + ongoing Unreleased section. (3) **PLAN.md restructuring**: Version-target-based (v0.8.0, v0.9.0, v1.0.0) + Backlog(Unscheduled) + Future Versions. (4) **Workflow integration**: Add versioning rules to CLAUDE.md — update plugin.json + CHANGELOG.md simultaneously on version milestone completion.
+**Consequence**: Project progress is linked to clear version targets. "What to do next" in PLAN.md is visible at the version level. CHANGELOG.md provides change history to external users.
+
+## DR-046: dev/ Module Archive Cleanup
+
+**Date**: 2026-02-26
+**Status**: active
+**Context**: Phase 5 SWE module launch (DR-039) archived 32 pre-pivot skeleton files to `dev/archive/`. These were consulted during SWE design but have no further use. Empty `commands/dev/`, `agents/dev/`, `skills/dev/`, `templates/dev/` directories remained from the pre-pivot era. No production code references these paths — only knowledge entries and agent examples use them as hypothetical illustrations.
+**Decision**: (1) Delete `dev/archive/` (4 subdirectories, 31 files) via safe-rm to `.trash/`. Git history permanently preserves content. (2) Remove empty `commands/dev/`, `agents/dev/`, `skills/dev/`, `templates/dev/` directories. (3) Knowledge entries and agent examples referencing `agents/dev/` etc. are retained as-is — they are illustrative, not functional references.
+**Consequence**: Cleaner directory structure. No dev module artifacts in the deliverable. Future dev module (if any) starts fresh rather than inheriting pre-pivot skeletons.
+
+## DR-047: SessionStart Hook — STATUS.md Auto-Injection
+
+**Date**: 2026-02-27
+**Status**: active
+**Context**: After context compaction, the AI loses session state (files read, in-progress work). CLAUDE.md and MEMORY.md are always re-injected, but project-specific status (current tasks, blockers, next steps) is lost. This forces manual re-reading of status documents every time compaction occurs.
+**Decision**: Add a SessionStart hook that fires on startup, resume, compact, and clear events. The hook reads STATUS.md (project root) or dev/STATUS.md (ouroboros internal fallback). This is a universal pattern — any project can benefit by maintaining a STATUS.md file. The ouroboros-internal fallback uses awk to extract only State + Immediate Next sections (skipping Backlog for brevity).
+**Consequence**: Session continuity across compaction events. Projects outside ouroboros can opt in by creating a STATUS.md file.
+
+## DR-048: SWE --fast Flag and Relaxed Skip Conditions
+
+**Date**: 2026-02-27
+**Status**: active
+**Context**: The SWE 8-stage pipeline provides thorough engineering methodology but is overkill for simple changes (bug fixes, one-line tweaks, familiar-domain modifications). Users need a way to reduce ceremony without manually calculating depth for each stage.
+**Decision**: Add `--fast` flag as syntactic sugar for `--depth Light` plus relaxed skip conditions at primitive stages. Relaxed skips are more aggressive than standard Skip conditions: Constrain skips on single-file/no-dependencies, Design skips when existing patterns cover the change, Interface skips on single-module-boundary changes, Verify skips when tests pass and change < 50 lines, Optimize defaults to skip unless explicit performance concern. Understand/Test/Implement never skip even in fast mode. `--depth` always overrides `--fast` when both are present.
+**Consequence**: Simple tasks that previously required full 8-stage ceremony can now run in 3-5 stages at Light depth. The flag is available on all 5 composites and 8 primitive commands.
+
+## DR-049: Research 2-Tier Architecture with Gemini Opt-in
+
+**Date**: 2026-02-27
+**Status**: active
+**Context**: The /research command ran all phases (collection + analysis) in the main opus context, which is expensive for the I/O-heavy collection phase (Glob, Read, WebFetch, WebSearch). Collection requires no judgment — it's mechanical data gathering.
+**Decision**: Split /research into 2 tiers: (1) Sonnet collector — handles all source gathering via Task(model: "sonnet"), (2) Opus researcher — handles deep analysis, pattern extraction, knowledge base cross-referencing. Additionally, add `--gemini` flag for Mode C (topic research) that uses gemini-3-flash-preview via invoke-model.sh for web search, with sonnet WebFetch for detailed content retrieval. Falls back to Claude WebSearch if gemini CLI is not installed.
+**Consequence**: Significant cost reduction on research collection. Gemini provides an alternative search perspective when opted in. The 2-tier pattern can be applied to other commands' collection phases.
+
+## DR-050: Plan Mode Integration — Guidelines Over Hooks
+
+**Date**: 2026-02-27
+**Status**: active
+**Context**: Investigated whether EnterPlanMode can be hooked for ouroboros workflow automation. Web research revealed that `PostToolUse:EnterPlanMode` only fires when Claude programmatically calls `EnterPlanMode`, not when users enter plan mode via `Shift+Tab` or `--permission-mode plan`. This makes hook-based plan mode detection unreliable.
+**Decision**: Maintain the current CLAUDE.md guideline approach for plan mode integration. No hook automation for plan mode. The existing `allowed-tools` frontmatter in commands already provides write protection comparable to plan mode's read-only constraint. Ouroboros commands have built-in exploration and planning phases that serve the same purpose as plan mode for ouroboros-specific workflows. Plan mode remains recommended only for "how to change ouroboros code" (development meta-work), not for running ouroboros commands.
+**Consequence**: No code changes needed. The current Plan Mode Integration section in CLAUDE.md is sufficient. Reassess if Claude Code adds reliable plan mode hook support in future versions.
+
+## DR-051: PreCompact Hook — Context Snapshot for Compaction Quality
+
+**Date**: 2026-02-27
+**Status**: active
+**Context**: Auto-compaction at ~83.5% context capacity summarizes older conversation, losing specific details (error messages, function signatures, architectural decisions). Need to improve compaction quality for ouroboros development sessions.
+**Decision**: Two-layer approach: (1) PreCompact command hook outputs a structured context snapshot (recent git changes, current task state from STATUS.md) that gets included in the compaction summary, (2) CLAUDE.md compaction recovery guidelines instruct Claude to re-read STATUS.md and restore context post-compaction. CLAUDE.md is reloaded from disk after compaction, making it the most reliable persistence channel. The SessionStart hook already injects STATUS.md on `/compact` and `/clear`, providing automatic recovery for those paths.
+**Consequence**: Auto-compaction summaries will include structured project state. Manual compaction with custom instructions remains optimal. PostCompact hook does not exist yet (upstream feature request), so auto-restore after auto-compaction requires manual re-reading.
+
+## DR-052: SubagentStop Output Capture — Opt-in Evaluation Workflow
+
+**Date**: 2026-02-27
+**Status**: active
+**Context**: Running `/evaluate --output` requires manually capturing agent output and passing it as an argument. SubagentStop hook event provides `agent_type`, `agent_id`, `agent_transcript_path`, and `last_assistant_message` on subagent completion.
+**Decision**: Create `capture-output.sh` triggered by SubagentStop for ouroboros agent types. Opt-in via `OUROBOROS_CAPTURE=1` environment variable (default off). Captures `last_assistant_message` to `.captures/{timestamp}-{type}-{id}.md` with frontmatter metadata. Runs async (non-blocking). Only matches agent types matching `ouroboros:(core|swe):*` pattern.
+**Consequence**: When `OUROBOROS_CAPTURE=1` is set, all ouroboros agent outputs are automatically saved. Users can then run `/evaluate foo.md --output .captures/20260227-evaluator-abc123.md` without manual copy-paste. `.captures/` is gitignored as ephemeral working data.
+
+## DR-053: Skills Cross-tool Compatibility — Structural Parity, Content Gap
+
+**Date**: 2026-02-28
+**Status**: active
+**Context**: v0.12.0 multi-model ecosystem requires investigating whether ouroboros skills can be used by Gemini CLI and Codex CLI. SKILL.md format is emerging as a cross-tool standard (AAIF). Tested all 7 ouroboros skills against Gemini CLI and Codex CLI requirements.
+**Decision**: Frontmatter (`name` + `description`) and directory structure (`SKILL.md` + `references/`) are fully compatible across all three tools. However, two barriers prevent immediate symlinking: (1) `name` field values don't match directory names (e.g., `evaluation-methodology` vs `evaluation/`) — Codex may require matching. (2) Skill content contains Claude-specific references (Task tool, Edit tool, Claude Code constraints in `routing` skill). Symlink to `.agents/skills/` deferred until name normalization and content neutralization are addressed. GEMINI.md `@AGENTS.md` import provides project context for Gemini CLI in the interim.
+**Consequence**: Skills are structurally ready for cross-tool use but content adaptation needed. Name normalization (align `name` field with directory name) is low-risk. Content neutralization requires careful editing to preserve methodology while removing tool-specific instructions. Both are candidates for a future version.
+
+**Update (2026-02-28 — v0.12.0 porting completed)**: Both barriers resolved. `scripts/port-skills.sh` generates neutralized copies from originals to `.agents/skills/` via sed transforms: name normalization, See Also removal, slash command neutralization, internal path generalization, Claude-specific type filtering (Command/Hook/CLAUDE.md removed from evaluation), model/tool name generalization in agent-criteria.md. 5 methodology skills ported (brainstorming, swe-constraint, swe-methodology, evolution, evaluation). 2 skipped (routing — Claude Code architecture, validation — Claude Code plugin structure). PoC confirmed: Gemini CLI and Codex CLI both auto-discover and load skills from `.agents/skills/`. Regeneration is idempotent: `clean → generate → status` produces identical output.
+
+## DR-004-update: CLAUDE.md / AGENTS.md Split — Extended for Multi-model Ecosystem
+
+**Date**: 2026-02-28
+**Status**: active (extends DR-004)
+**Context**: DR-004 established that the plugin uses `CLAUDE.md` and user projects use `AGENTS.md`. With v0.12.0, ouroboros itself needs to be accessible to Gemini/Codex CLI for development participation.
+**Decision**: Split ouroboros `CLAUDE.md` into two files: `AGENTS.md` (shared development guidelines — conventions, versioning, session workflow, commit rules, document roles) and `CLAUDE.md` (Claude Code-specific rules — skill invocation, plan mode, model routing, safe deletion, compaction recovery, hooks, memory policy). Claude Code reads both files automatically. Added `GEMINI.md` with `@AGENTS.md` import for Gemini CLI. Codex CLI reads `AGENTS.md` natively.
+**Consequence**: All three AI tools can participate in ouroboros development with appropriate context. No instruction duplication — AGENTS.md is the single source for shared guidelines.
+
+## DR-054: Parallel Mode B — Batch Evaluation for Module Scan
+
+**Date**: 2026-02-28
+**Status**: active
+**Context**: v0.13.0 Phase 1. Mode B (Module Scan) evaluates components one at a time — 10 components × ~90s = 15 minutes. All evaluations are read-only and independent, so no shared state prevents parallelism.
+**Decision**: Evaluate components in batches of 3. Each batch launches up to 3 Claude Tasks + 3 Codex Bash (if `--multi`) simultaneously. Circuit breaker checks at batch boundaries. `--sequential` flag for opt-out. Temp files indexed: `.tmp/{SESSION_ID}_{idx}_relay.txt`.
+**Alternatives considered**: (1) Unlimited parallelism — risk of platform limits and context window exhaustion. (2) Batch of 2 — too conservative, 2× vs 3× speedup. (3) Dynamic batch sizing — over-engineered for predictable workload.
+**Consequence**: ~3× wall-clock reduction for Mode B evaluation. Single-model Mode B also benefits (3 concurrent Claude Tasks). Update `evaluate.md` Phase 3 and `parallel-execution-pattern.md`.
+
+## DR-056: Quality Sprint — Criteria Threshold Adjustment and E-tier Quick Wins
+
+**Date**: 2026-03-01
+**Status**: active
+**Context**: v0.13.0 baseline (core-007) showed 6 components stuck at Level 3 due to E-tier < 3: 4 commands (adopt, evaluate, research, upgrade) with E=1/4, 2 skills (evaluation/SKILL, validation/SKILL) with E=2/4. DR-055 identified F2/F4 threshold rigidity for complex-domain skills.
+**Decision**: Execute quick-win sprint targeting three areas: (1) Criteria threshold adjustment — F2 word limit 2,000→2,500, F4 "2-5 reference files"→"logically organized categories" to eliminate cliff effects for complex-domain skills. (2) E4 integration sections — See Also for skills, context-variable next actions for commands. (3) E1+E2 inline→reference extraction — relay prompts, batch patterns, and parsing logic delegated to reference files. All verification via `--multi` (Claude + Codex) to minimize self-evaluation bias.
+**Result**: core-008: 309/331 (93.35%), Level 4: 15 (+6), Level 3: 6 (-6). E4 achieved unanimous 1 across all 6 components (strongest signal). E1/E2 improved from consensus_zero to split (Claude=1, Codex=0) — Codex flags residual inline detail that is structurally necessary for command orchestration. No regressions. Agreement rate improved 83.1%→86.0%.
+**Alternatives considered**: (1) Full `/evolve --multi` pipeline for each command — too slow (4× context windows), researcher would likely suggest same E1/E2/E4 targets. (2) Wait for v0.14.0 feature work to fix E1/E2 opportunistically — delays Level 4 by a version cycle. (3) Aggressively remove all inline shell commands — would break orchestration readability.
+**Consequence**: Criteria thresholds now accommodate complex-domain skills without penalizing them. E1/E2 split is accepted as structural baseline for commands — further improvement requires architectural change (e.g., script extraction), not content editing. Test set updated (GT-001, GT-004, GT-005 E4→1, E1/E2→borderline).
+
+---
+
+## DR-055: Unanimous Convergence — Viability and Criteria Threshold Findings
+
+**Date**: 2026-03-01
+**Status**: active
+**Context**: v0.13.0 `--unanimous` convergence retest on evaluation/SKILL.md (68.75% batch agreement, most contentious non-structural component). Claude 13/16 vs Codex 12/16, 3 divergent criteria (F2, F4, E4).
+**Decision**: `--unanimous` is viable as selective quality path. All 3 divergent criteria converged in 1 iteration via factual evidence (word count 2,099 > 2,000, reference count 11 > 5) and conjunctive criterion argument (E4). However, unanimous score (11/16, Level 1) vs majority (14/16, Level 3) reveals criteria threshold rigidity — F2/F4 thresholds penalize complex-domain skills disproportionately. Backlog: criteria threshold adjustment for skill type in v0.14.0.
+**Alternatives considered**: (1) Make unanimous the default — too slow (~3× cost), cliff effects from rigid thresholds. (2) Adjust thresholds now — premature without broader data. (3) Abandon unanimous — discards proven factual-error-catching value.
+**Consequence**: `--unanimous` remains opt-in quality path. Self-enhancement bias warning effective (Claude 16/16 → 13/16 self-correction). F2/F4 threshold review added to v0.14.0 backlog. See `dev/experiments/unanimous-convergence/analysis.md`.
+
+## DR-057: Deep Research — Iterative Goal-Driven Research via `--deep` Flag
+
+**Date**: 2026-03-01
+**Status**: active
+**Context**: `/research` is a single-pass 8-phase pipeline. `synthesis-patterns.md` defines Gap Analysis but there is no feedback loop — gaps are recorded but never resolved. Deep research tools (Gemini Deep Research, Perplexity Pro) demonstrate the value of iterative refinement, but their approach is opaque and not integrated with the knowledge base.
+
+**Decision**: Add `--deep` flag to `/research` (not a separate command) for iterative, goal-driven research:
+
+1. **Flag over command**: 90% infrastructure shared (Phase 1-2 collection, Phase 4-8 worktree/report). Consistent with `--multi` flag pattern. Phase numbering preserved.
+2. **Autonomous convergence**: No user-specified `--depth`. Orchestrator extracts research questions + acceptance criteria at start, then iterates until criteria are met. Internal safety cap (5 rounds) not exposed to user. Rationale: system judges "enough research" better than humans via criteria, avoiding both "too shallow" and "too deep" outcomes.
+3. **Auto collection expansion**: `--deep` auto-detects all available collection tools (Gemini CLI if installed). Existing `--gemini` flag remains for non-deep explicit opt-in. `--deep --gemini` treats `--gemini` as redundant (no warning).
+4. **Mode restriction**: Mode B (web) + Mode C (topic) only. Mode A (local) has no additional sources to collect — warning + fallback to standard research.
+5. **Convergence conditions**: 5 stop conditions (all criteria met, no gaps remain, source saturation, safety cap, no progress). Orchestrator evaluates after each round.
+6. **Researcher unchanged**: The researcher agent itself is not modified. Coverage assessment is added via relay prompt instructions referencing `deep-research-procedure.md`.
+
+**Alternatives considered**: (1) Separate `/deep-research` command — duplicates 90% of `/research` infrastructure, maintenance burden. (2) User-specified `--depth N` — users cannot predict optimal depth; fixed depth either wastes resources or stops too early. (3) Always iterate (no `--deep` flag) — increases cost for simple lookups where single-pass is sufficient.
+**Consequence**: Reference file `skills/core/research/references/deep-research-procedure.md` contains convergence logic, gap report format, and iteration rules. Schema R gains optional `coverage_assessment`. Relay prompt templates gain deep variant. Knowledge entry template gains optional "Research Process" section.
+
+## DR-058: Spiral Evolution — Policy-Composed State Machine Architecture
+
+**Date**: 2026-03-02
+**Status**: active
+**Context**: v0.14.7 achieved SWE 18/18 Level 4. The spiral (`/swe spiral`) is the meta-composite orchestrating Spec→Dev→Ship→Tune, but it's strictly linear: no backward transitions (despite declaring support), no parallel execution, no adaptive depth. Dogfooding on mdsearch (3 tasks) revealed: backward transition never used (even when needed — task 003 SAFETY-2 should have regressed to Design), Ship P2 issues deferred to next cycle instead of fixed, and users bypass the spiral for lightweight tasks. Research phase: Double Diamond (1st Research → Brainstorm → 2nd Research) produced 2 knowledge entries and 14 brainstorm ideas across 4 techniques.
+
+**Research evidence base**:
+- `docs/knowledge/ai-native-development-workflow-patterns.md` — 18 sources: state machine > DAG (LangGraph, Temporal, Val Town convergence), 3 orchestration primitives (sequential/parallel/iterative), checkpoint-based decomposition (Devin), mode consolidation pressure (OMC 9→fewer), "15-minute waterfall" as dominant AI-native micro-methodology
+- `docs/knowledge/spiral-architecture-implementation-patterns.md` — 15 sources: LangGraph transition function table (`add_conditional_edges`), Temporal FSM with signals, LangGraph SQLite checkpoint schema (`parent_checkpoint_id` linked list), CI/CD cascade invalidation unsolved (Buildkite doesn't support it), ActionPlan probe boundary pattern, Dapr compensation pattern (unnecessary for pure artifact transforms)
+
+**Decision**: Single state machine with composable transition policies, not multiple named modes.
+
+### 1. Architecture: One State Machine, Three Initial Policies
+
+The spiral becomes a state-machine orchestrator reading `spiral-state.json`. Composites (spec, dev, ship, tune) remain pure executors. Three named policy presets map to transition table configurations:
+
+| Policy | Traversal Behavior | Use Case |
+|--------|-------------------|----------|
+| **linear** | Forward-only with user-initiated regression. Current behavior formalized. Max 3 regressions. | Default. General-purpose tasks |
+| **probe** | Light-depth exploration → confidence check → escalate or pivot. Hypothesis-driven iteration. | POC, spikes, exploratory tasks |
+| **parallel** | Eligible stages run concurrently via worktree isolation. Ship.Security + Ship.CodeReview. | Large tasks with independent review stages |
+
+Policies compose: `--policy probe+parallel` = hypothesis testing with parallel probes. Interface: `--policy <name>` flag on `/swe spiral`.
+
+**Rationale**: OMC had 9 modes that collapsed to fewer active ones. Named modes proliferate. A single state machine with configurable transition tables avoids sprawl while named presets maintain discoverability. Research shows all orchestration patterns reduce to 3 primitives (sequential, parallel, iterative) — policies compose these primitives.
+
+### 2. Transition Function Table
+
+The Decision Matrix in spiral.md (14 branch conditions) is already a transition function table in prose. Externalize to JSON policy files:
+
+```json
+{
+  "policy": "linear",
+  "transitions": {
+    "spec_composite": {
+      "on_success": "spec_dev_transition",
+      "on_failure": { "retry": "spec_composite", "abort": "terminated" }
+    },
+    "dev_composite": {
+      "on_success": "dev_ship_transition",
+      "on_failure": { "retry": "dev_composite", "regress": "spec_composite", "abort": "terminated" }
+    }
+  }
+}
+```
+
+Pattern from: LangGraph `add_conditional_edges(source, router_fn, {label: target})`.
+
+### 3. State Persistence: `spiral-state.json`
+
+Single JSON file in `.swe/active/`. Schema refined from LangGraph checkpoint model and WorkflowEngine.io process instance, simplified for single-user file-based environment:
+
+- `stages`: flat dict with per-stage status enum (`pending|running|completed|invalidated|stale`)
+- `checkpoints`: array with parent links (LangGraph `parent_checkpoint_id` pattern)
+- `transitions`: append-only event log for auditability
+- `regression_count` + `max_regressions` as circuit breaker (OMC pattern)
+
+### 4. Checkpoint-Rewind with Cascade Invalidation
+
+Backward transition = restore checkpoint N, re-execute from there. Artifact versioning via `.swe/active/.versions/{NN}-{stage}.v{N}.md`.
+
+Cascade invalidation algorithm (novel — CI/CD systems don't support this natively):
+1. When Stage N artifact is re-versioned, traverse Selective Load Matrix in `artifact-contracts.md`
+2. Downstream stages with "Required" dependency → invalidated (must re-execute)
+3. Downstream stages with "Optional" dependency → stale (re-evaluate, may preserve)
+4. Present invalidation list to user for decision (human-in-the-loop)
+
+### 5. Probe Execution (deferred to v0.15.0-phase-2)
+
+Probe artifacts in `.swe/active/.probe/` (file-system isolation). Promotion = copy to active. Discard = cleanup. Requires spiral command to support stage-level re-entry (not just composite), which is a larger refactor.
+
+**Deferred because**: linear policy with regression (items 1-4) delivers the core value — backward transitions and state tracking. Probe builds on this foundation. Implementing both at once risks over-engineering before dogfooding validates the state machine.
+
+### Implementation Order
+
+| Phase | Scope | Files | Effort |
+|-------|-------|-------|--------|
+| **Phase 1** | State file + linear policy | `spiral-state.json` schema, `spiral.md` refactor, `artifact-lifecycle.sh` extension | Medium (3-5 sessions) |
+| **Phase 2** | Checkpoint-rewind + cascade | `.versions/` convention, cascade algorithm, state file checkpoint entries | Medium (2-3 sessions) |
+| **Phase 3** | Parallel policy | Ship.Security + Ship.CodeReview via TeamCreate + worktree | Small (1-2 sessions) |
+| **Phase 4** | Probe policy | `.probe/` directory, stage-level re-entry, confidence thresholds | Large (4-6 sessions) |
+
+New reference files: `skills/swe/methodology/references/spiral-state.md` (state schema, transition rules), `skills/swe/methodology/references/stage-capabilities.md` (dependency graph, parallelism matrix). Template: `templates/swe/spiral-state.json`.
+
+**Alternatives considered**:
+
+1. **Multiple named modes (linear, swarm, probe as separate commands)** — 7 paradigm candidates from preliminary analysis. Rejected: mode consolidation pressure (OMC evidence), maintenance burden of parallel codepaths, policy composition impossible with separate commands.
+2. **Full state machine library (XState, Python transitions)** — Rejected: Claude Code plugin runs in markdown command files, not executable code. JSON transition tables achieve the same behavior with no runtime dependency.
+3. **Probe as default (always try cheap first)** — Rejected: unpredictable execution cost, users lose budget predictability. Better as opt-in policy.
+4. **Confidence thresholds at all gates** — Rejected: confidence calibration is hard, no production examples of "probe then promote" in AI coding pipelines. Start with binary gates, evolve to confidence when dogfooding provides calibration data.
+5. **Eliminate Ship composite (fold into Verify)** — Rejected: Ship has distinct ownership (reviewer agent), severity classification (P1/P2/P3), and user checkpoint. Per-composite depth `--depth H:Light` already minimizes Ship ceremony.
+
+**Consequence**: v0.15.0 implements Phases 1-2 (state machine + linear policy + checkpoint-rewind). Phases 3-4 are v0.15.5+ based on dogfooding results. Methodology SKILL.md gains "Fixed stages, variable traversal" principle and Modes section. `docs/designs/v0.15.0-spiral-analysis.md` preserved as research artifact.
+
+## DR-059: Probe as Default Policy — Orthogonal Depth × Policy Model
+
+**Date**: 2026-03-02
+**Status**: active
+**Context**: v0.15.0 delivered the state machine with `linear` as the only policy. Planning v0.15.1 (probe policy), UX review revealed the spiral's flag surface was already complex (`--fast`, `--depth`, `--policy`), and adding `--policy probe` as opt-in would increase cognitive load. The depth and policy flags were conceptually coupled — `--fast` is a depth shortcut but behaves differently under different policies.
+
+**Decision**: Make `probe` the default policy and restructure depth/policy as orthogonal dimensions:
+- **Depth** (how deep): `--fast` (Light) / default (Standard) / `--deep` (Deep, new) / `--depth S:Deep D:Std ...` (per-composite)
+- **Policy** (how to traverse): `probe` (default) / `linear` (opt-in) / `parallel` (future)
+- Depth controls the escalation target, policy controls the traversal behavior. Each dimension is independent.
+
+**Rationale**:
+- Probe as default means the simplest invocation (`/swe spiral "task"`) uses the smartest traversal — Light first, escalate only if needed
+- `--fast` semantics unchanged from user perspective (still "quick"), but now explained as "Light target where probe degrades to direct execution"
+- `--deep` added as symmetric counterpart to `--fast` — `--depth Deep` shortcut
+- `--policy linear` for users who want direct execution without probing
+- Confidence check is user-driven (no auto-threshold) — DR-058 rejected automated confidence as uncalibrated
+
+**Alternatives rejected**:
+1. **Probe as opt-in (`--policy probe`)** — adds a flag for the recommended default behavior; users who don't know about it miss the benefit
+2. **Auto-escalate** — requires quality criteria that don't exist yet; deferred until dogfooding provides calibration data
+3. **Named presets (`--preset quick/explore/thorough`)** — replaces two orthogonal dimensions with a flat list; less composable
+
+**Consequence**: Default spiral behavior changes from "direct Standard" to "probe Light → escalate to Standard if needed". `--policy` flag rarely needed in practice. `--deep` flag added. DR-058's phased plan (Phase 3: probe) delivered as v0.15.1 with the UX simplification.
+
+## DR-060: SWE Pipeline Parallelism — Stage Parallel + Multi-Model
+
+**Date**: 2026-03-02
+**Status**: active
+**Context**: v0.15.5 was originally planned as "Parallel Policy" — a spiral-level `--policy parallel` with worktree fan-out/fan-in across composites. Analysis revealed this was infeasible: the SWE artifact chain is strictly sequential (each composite depends on the previous composite's output). However, independent sub-stages within composites exist: Ship has Security Review + Code Review (both read implementation artifacts independently), Tune has Improve + Retrospect (different file domains — source code vs. artifact chain). Additionally, core commands have mature `--multi` (11+ commands) but SWE pipeline had zero multi-model support.
+
+**Decision**: Two independent parallelism axes, both composite-internal:
+- **Stage parallelism** (speed, always active): At Standard+ depth, independent sub-stages run as parallel Tasks. Ship: Security Review ‖ Code Review. Tune: Improve ‖ Retrospect. No opt-in needed — reviewer Tasks are read-only, Improve/Retrospect touch different files.
+- **Multi-model parallelism** (quality, `--multi` opt-in): Ship adds Codex security + code reviews alongside Claude (2×2 grid). Tune adds Codex evaluator alongside Claude evaluator. Finding union + severity consensus for reviews; priority consensus for evaluation targets.
+- **Spiral-level `--policy parallel` removed** from the roadmap. Stage-level parallelism is composite-internal, not a traversal policy.
+- **`--multi` relayed by spiral**: `spiral --multi` passes the flag to Ship and Tune composites.
+- **P1 severity disputes resolve to P1** — false negatives (missing a critical finding) are more costly than false positives.
+
+**Alternatives rejected**:
+1. **Spiral-level `--policy parallel`** — artifact chain is strictly sequential; composites cannot run in parallel
+2. **Auto-parallelism without flag** — debugging multi-model consensus issues requires explicit opt-in to isolate
+3. **Multi-model for all composites** — Spec (analyst) and Dev (implementer) don't benefit from model consensus; code synthesis is single-model
+
+**Consequence**: DR-058's `parallel` policy row removed from the traversal policy table. Ship and Tune composites gain `--multi` flag. Three new relay response schemas (SR, CR, SQ) and SWE relay prompt templates added. Stage parallelism is transparent — users see faster Ship/Tune without any flag changes.
+
+## DR-061: Team Spiral — Pipelined Composite Execution
+
+**Date**: 2026-03-02
+**Status**: active
+**Context**: Track A complete (v0.15.0 linear → v0.15.1 probe → v0.15.5 stage parallelism). All three are single-agent policies — the main conversation orchestrates composites sequentially via Skill tool. Track B introduces multi-agent collaboration: multiple persistent specialists execute composites concurrently, with cross-perspective review and dynamic backtracking. Key questions: entry point (new command vs policy flag), team topology, composite invocation model, and how gates work in a pipelined context.
+
+**Decision**: `--policy team` on existing spiral.md. Director (main conversation) + 3 persistent specialist teammates (Shaper, Builder, Critic) spawned via Agent tool with `team_name`. Pipelined composite execution with cross-review:
+
+- **Pipelined execution**: When a composite completes, the next composite and a cross-review of the just-completed composite start simultaneously. Gates auto-check artifact existence rather than blocking for user approval. Only the P1 gate after Ship is blocking.
+- **Specialist composite invocation**: Specialists invoke composites directly via Skill tool (verified: teammates have full access to all 22 ouroboros skills). Director handles state machine updates exclusively to prevent race conditions.
+- **Cross-review protocol**: After Spec, Critic reviews architecture/constraints/interface for quality. After Dev, Shaper reviews implementation for domain correctness. Findings classified as P1 (contract-breaking → backtrack) or P2/P3 (non-blocking → deferred to Tune).
+- **Dynamic backtracking**: Cross-review P1 triggers backtracking. Director evaluates downstream progress — if Builder is in early stage (Test), halt and revise; if late stage (Implement+), continue and flag for urgent fix in Tune. Reuses existing regression protocol (checkpoint → cascade → restore).
+- **Director relay checkpoint**: Composite Review content sent to Director via SendMessage, Director shows to user. Timeout auto-proceed if no user response.
+- **Collaborative Tune**: All 3 specialists contribute perspectives (domain insight, implementation challenges, quality findings) before Director invokes Tune.
+- **Team topology**: Shaper owns Spec + cross-reviews Dev output. Builder owns Dev + does codebase pre-analysis during Spec. Critic owns Ship + cross-reviews Spec output + early security scan during Dev. Naming deliberately differs from composite-internal agents (analyst/implementer/reviewer) to distinguish role layer from execution layer.
+- **State machine v2**: `spiral-state.json` gains `team` section (specialist status, cross-review tracking) with version bump to 2. Backward-compatible — non-team policies use version 1 schema.
+
+**Alternatives rejected**:
+1. **Separate `team-spiral.md` command** — mode proliferation (OMC research warning). Single entry point with policy flag is more composable and discoverable.
+2. **Director-only Skill invocation (advisory specialists)** — tested in design phase; no genuine collaboration, just "sequential pipeline with background readers." Contradicts the goal of real concurrent engineering.
+3. **Stage-level pipelining (primitive commands)** — deferred to v0.16.5. Composite-level pipelining provides meaningful overlap with manageable orchestration complexity. Stage-level adds mid-composite intervention but requires message checkpoints between every stage.
+4. **Specialist agent definition files** — unnecessary. Existing agents (analyst/implementer/reviewer) are composite-internal executors invoked by Task tool. Team specialists are persistent teammates with different lifecycle — spawned via Agent tool with team_name, prompted inline.
+5. **Separate team state file** — synchronization burden with spiral state. Single `spiral-state.json` with conditional team section avoids dual-source-of-truth.
+
+**Consequence**: spiral.md gains third traversal policy. Team execution details delegated to `references/team-execution-pattern.md` (~250 lines). State schema version bumps to 2. Existing `linear` and `probe` policies unchanged. v0.16.5 extends to stage-level pipelining, team+probe composition, and cross-turn learning.
+
+## DR-062: Team Spiral Advanced — Stage-Level Pipeline, Bridge Agent, Cross-Turn Learning
+
+**Date**: 2026-03-02
+**Status**: active
+**Context**: v0.16.0 delivers composite-level pipelining (Director + 3 Specialists). Three limitations remain: (1) composites are black boxes — Specialist calls `/swe spec` and 4 stages run internally with no mid-composite intervention; (2) turn-to-turn learning is disconnected — each spiral turn starts fresh without feedback from the previous; (3) only Claude agents can be specialists — no external model participation.
+
+**Decision**: v0.16.5 introduces five features addressing these limitations:
+
+1. **Stage-level pipelining**: Specialists invoke primitive commands individually (`/swe understand`, `/swe constrain`, ...) instead of composite calls. Message checkpoints between stages enable intra-composite cross-review (e.g., Critic reviews Design immediately, Builder starts Dev before Interface completes). Default for Standard+ depth; `--composite-level` or `--fast` reverts to v0.16.0 behavior.
+
+2. **team+probe composition** (`--policy team+probe`): Combines team pipelining with probe's adaptive depth. Each specialist runs at Light depth first, then Director presents results with cross-review findings for user escalation decision. Cross-review findings inform the keep/escalate choice.
+
+3. **Cross-turn learning**: Tune generates a `learning-delta.json` (depth calibration per-composite, team effectiveness metrics, process improvements). Next turn's Phase 2 loads the delta and presents advisory depth adjustments. `spiral-state.sh learning-delta save/load` actions.
+
+4. **Generator-Critic loops**: At Standard+ depth in team policy, Design and Interface stages get 2-pass verification. Shaper generates → Critic reviews → P1 triggers revision → Critic re-verifies (max 2 iterations).
+
+5. **Bridge Agent + selective routing** (`--route "understand=codex,implement=codex"`): External models (Codex/Gemini) participate as team members via Bridge Agent. Bridge Agent (`agents/swe/bridge.md`, model: sonnet) manages multi-turn MCP conversation with external model, handles all file operations on its behalf, and reports artifacts to Director. Subscription-based MCP servers (ChatGPT Plus via `codex mcp-server`, Google account via `gemini-cli-mcp`) — no per-token API costs. Circuit breaker: 3 consecutive failures → escalation to Director → fallback to Claude specialist.
+
+**Key design choices**:
+
+| Aspect | Choice | Rationale |
+|--------|--------|-----------|
+| Stage-level default depth | Standard+ only | Light depth: stage-level overhead exceeds benefit. `--fast`/`--composite-level` reverts to v0.16.0 |
+| Bridge Agent model | sonnet | Relay/execution role — external model provides domain reasoning, Bridge provides tools. Lightweight model sufficient |
+| MCP config | Subscription-based (.mcp.json) | User subscribes to ChatGPT Plus and Gemini — API keys would add per-token cost on top of subscriptions |
+| `--route` vs `--multi` | Independent flags | `--multi` = one-shot relay for eval/review (invoke-model.sh). `--route` = stage delegation via Bridge Agent (MCP). Different mechanisms, different purposes |
+| Learning delta format | Advisory only | Delta recommends depth adjustments; user decides. No auto-adjustment — avoids feedback loops |
+
+**Alternatives rejected**:
+1. **API key-based MCP** — rejected by user due to double-billing (subscription + API). Subscription-based MCP reuses existing ChatGPT Plus/Gemini Pro subscriptions.
+2. **Bridge as general-purpose subagent** — too much autonomy. Bridge should relay decisions, not make them. sonnet model + structured protocol keeps it focused.
+3. **Auto-escalation in team+probe** — deferred. User-driven escalation decisions maintain transparency. Future versions may add confidence-based auto-escalation.
+
+**Consequence**: team-execution-pattern.md gains ~200 lines (Stage-Level Protocol, Probe Composition, Selective Routing, Bridge Integration, Generator-Critic). spiral.md adds `--route` and `--composite-level` flags. New files: `agents/swe/bridge.md` (120 lines), `.mcp.json` (subscription config). spiral-state.sh adds `stage-update` and `learning-delta` actions. tune.md adds learning delta generation.
+
+## DR-063: `/swe reverse` — Code-First Specification Recovery
+
+**Date**: 2026-03-03
+**Status**: active
+**Context**: All `/swe` commands operate forward — from task description to artifacts to code. When onboarding to an existing codebase, the reverse direction is needed: from code to specification artifacts. The team also lacks structured methodology skills for persuasion (defending technical decisions) and teaching (calibrated explanation for decisions).
+
+**Decision**: v0.17.0 adds three features:
+
+1. **`/swe reverse`** (`commands/swe/reverse.md`): New command taking a codebase path as input (not task description). Builds codebase inventory, delegates to analyst Procedure 5 (Reverse) for all 4 specification artifacts in a single invocation. Outputs to same `.swe/active/01-04.md` paths as forward pipeline — full forward compatibility. Confidence markers (Explicit/Inferred/Assumed) mandatory on every conclusion.
+
+2. **Persuasion skill** (`skills/swe/persuasion/`): Structured technical argumentation grounded in psychology research — Cialdini's 6 principles, Aristotle's rhetoric, Kahneman System 1/2, Toulmin model, SCQA/Minto Pyramid, pre-suasion, steel-manning, cognitive bias toolkit. Referenced by reviewer agent (code review findings) and analyst agent (design defense).
+
+3. **Teaching skill** (`skills/core/teaching/`): Decision-focused knowledge transfer based on learning methodology research — Bloom's Taxonomy (target minimum cognitive level), ZPD (scaffold within reachable zone), Cognitive Load Theory (eliminate extraneous, maximize germane), Feynman Technique, Schema Theory (anchor to known concepts). Core skill (not SWE-specific) for analyst, onboard, brainstorm.
+
+**Key design choices**:
+
+| Aspect | Choice | Rationale |
+|--------|--------|-----------|
+| Reverse as new command | `/swe reverse` not `--reverse` flag | Input model fundamentally different (path vs task). Clean separation of concerns |
+| Single analyst invocation | All 4 artifacts in one call | Codebase context is shared across all artifacts. 4 separate calls would re-read the same files |
+| Teaching in core, not SWE | `skills/core/teaching/` | Reusable across brainstorm, onboard, research — not SWE-specific |
+| Confidence markers | Mandatory in reverse | Forward analysis has requirements as source of truth. Reverse has only code — inference must be marked |
+
+**Alternatives rejected**:
+1. **`/adopt --swe`** — would overload adopt's project analysis purpose. Reverse is about specification recovery, not project onboarding.
+2. **4 separate analyst calls for reverse** — inefficient for shared codebase context. Single invocation avoids redundant file reading.
+3. **Teaching in `skills/swe/`** — too narrow. Teaching methodology is domain-independent.
+
+**Consequence**: 8 new files (reverse.md, 3 persuasion, 3 teaching), analyst.md gains Procedure 5 (~80 lines), methodology SKILL gains reverse composite + related skills, pipeline-stages gains reverse stage card, reviewer/analyst gain cross-references.
+
+## DR-064: v0.18.0 — Developer Experience & Default Optimization
+
+**Date**: 2026-03-03
+**Status**: active
+**Context**: v0.18.0 scope covers 11 items across 6 categories (tool/permission, plan mode, session intelligence, documentation, dashboard). Too broad for a single version. Additionally, command argument analysis reveals that key defaults (`--multi` off, `--deep` off, `--save` off) require users to add flags for optimal results — the happy path should be zero-flag. Permission pattern `bash */ouroboros/scripts/*` fails to match relative path invocations, causing persistent permission prompts.
+
+**Decision**: Split into 3 sub-versions + 6 design choices:
+
+### Version Split
+
+| Version | Focus | Scope |
+|---------|-------|-------|
+| v0.18.0 | DX Quick Wins + LSP + Default Optimization | 6 config/text/command change items |
+| v0.18.5 | Session Intelligence + `/doctor` | 5 script development items |
+| v0.19.0 | Web Dashboard | webview-screensaver compatible Web UI |
+
+v1.0.0 follows after v0.19.0.
+
+### Design Choices
+
+| Aspect | Choice | Rationale |
+|--------|--------|-----------|
+| `--multi` default | Auto-detect (on when codex installed, single fallback when not) | Removes `--multi` burden from 10 commands. `--single` for opt-out |
+| `--deep` default | On for `/research` (`--shallow` opt-out) | Single-round collection is almost always insufficient |
+| `--save` default | On for `/evaluate` | Non-persistent results cannot be tracked/compared |
+| LSP template approach | Per-language files in `templates/core/lsp-configs/`, adopt selectively copies | JSON does not support comments. Cannot do full config + comment toggle — per-language templates are cleanest |
+| Permission pattern fix | `bash scripts/*` (relative path matching) | Existing `bash */ouroboros/scripts/*` fails to match when executed from CWD |
+| `/doctor` command | Placed in v0.18.5 (health check: CLI, MCP, settings, hooks, LSP) | Diagnostic tool becomes meaningful after v0.18.0 LSP/settings changes |
+| Web Dashboard | v0.19.0 (HTML/CSS/JS static, file:// protocol) | webview-screensaver compatible. No server required. spiral-state + session monitoring + drill-down |
+
+### Alternatives Rejected
+
+1. **`--multi` always on** — causes errors in environments without codex installed. Auto-detection is safer
+2. **JSONC .lsp.json** — Claude Code only supports standard JSON. Comments not possible
+3. **LSP marketplace dependency** — adopt creates files directly in the project. Marketplace install automation requires user consent
+4. **All items in v0.18.0** — scope too large. Maintains the sub-version split pattern from previous versions (v0.14.5/v0.14.6/v0.14.7)
+
+**Consequence**: v0.18.0 completes quickly with config/text/command edits. v0.18.5 focuses on script development. v0.19.0 enters the new technical domain of Web UI.
+
+## DR-065: Gemini Integration Removal — OAuth Account Safety
+
+**Status:** active
+**Date:** 2026-03-03
+**Context:** Since early 2026, Google has been mass-suspending accounts of users employing OAuth-based third-party automation. Suspensions occur not only from explicit OAuth exploitation tools like OpenClaw but also from using official headless features like `gemini -p` (google-gemini/gemini-cli#20813). Google's official position: "Use Vertex/AI Studio API keys for third-party automation." Given Gemini CLI's lack of MCP server mode support (unlike Codex, no session persistence) and low utilization, the decision was made to fully remove it.
+
+**Decision:** Fully remove Gemini integration from ouroboros. Switch to Codex-only multi-model.
+
+| Option Considered | Decision | Reason |
+|-------------------|----------|--------|
+| Keep OAuth | Rejected | Risk of entire Gmail/Drive/Photos loss if main Google account is suspended |
+| Switch to free API key | Rejected | Maintenance burden (parsing, routing, consensus protocol) not justified by utilization |
+| **Full removal** | **Adopted** | Eliminates risk + simplifies code. Codex MCP alone is sufficient for multi-model |
+
+**Supersedes:** DR-027 partially (Gemini provider), DR-035 (Gemini model routing), DR-049 (`--gemini` flag)
+
+**Change scope:** ~25 files. Delete GEMINI.md, remove gemini case from invoke-model.sh, remove gemini references from 5 commands, convert 7 routing skill files to 2-model, clean up agents/templates/docs. Historical records (DECISIONS.md, PLAN.md, ROADMAP.md, CHANGELOG.md, dev/experiments/) are preserved.
+
+**Rejected alternatives:**
+1. **mcacp ACP-to-MCP bridge** — Exposes Gemini `--experimental-acp` via MCP. Uses OAuth so same account suspension risk
+2. **AI Studio free API key** — 100 requests/day possible, but Gemini utilization is too low to justify maintenance cost
+3. **Separate Google account** — Provides isolation but increases management complexity, not a fundamental solution
+
+**Consequence:** Multi-model simplified to Claude + Codex two-party structure. consensus-protocol goes from 3-way to 2-way. Gemini models removed from routing-table. Can be reconsidered if Gemini CLI adds MCP server mode support or Google clarifies its OAuth automation policy.
+
+---
+
+## DR-066: Session Intelligence Architecture — Git-Based, Transcript-Based
+
+**Status:** active
+**Date:** 2026-03-03
+**Context:** After v0.18.0 DX improvements, session-level diagnostics and automation became necessary. Session history, friction detection, environment health checks, parallel execution stability.
+
+**Decision:** Instead of depending on Claude's internal session directory, use git log and JSONL transcripts as primary data sources.
+
+| Component | Data Source | Reason |
+|-----------|------------|--------|
+| session-history.sh | `git log` | Independent of Claude session path changes, work units naturally delineated by commits |
+| friction-report.sh | JSONL transcript | Directly extracts friction signals from conversation flow, post-hoc analysis |
+| choice-log.sh | PermissionRequest hook stdin | Real-time collection, append-only JSONL |
+| parallel.sh | `.tmp/` manifest files | In-session result tracking, file-based fan-in |
+| doctor.md | settings/hooks/plugin files | Static file inspection, not runtime state |
+
+**Key design choices:**
+1. **Git-based session history** — Uses `git log` instead of Claude session directory (`~/.claude/projects/`). Does not break on path changes
+2. **3-tier parallel resilience** — manifest-based collect → raw file re-parse → transcript recovery. Independent of existing capture-output.sh
+3. **PermissionRequest hook** — Asynchronously records user choices. Consumed as deny patterns by friction-report
+4. **doctor report-only** — `--fix` excluded from MVP. Diagnostic accuracy prioritized over auto-fix
+
+**Consequence:** 5 new files (4 scripts + 1 command), 4 existing files modified (hooks.json, session-start.sh, evaluate.md, evolve.md, parallel-execution-pattern.md). Recent Activity automatically displayed on session start.
+
+## DR-067: Living Project Model — Cumulative Specification
+
+**Status:** active
+**Date:** 2026-03-03
+**Context:** The SWE pipeline generates artifacts per feature and stores them in `.swe/record/`. Individual document quality is good, but when 10+ features accumulate, understanding the project's overall domain model, architecture, and interfaces requires reading all per-feature artifacts. The knowledge base also becomes harder to navigate as entries grow.
+
+**Decision:** Maintain project-level cumulative specifications in `docs/specs/project/` in addition to per-feature artifacts. Auto-updated on each spiral turn completion (Phase 10.6). Knowledge base auto-generates `docs/specs/knowledge/INDEX.md`. (Path changed from `.swe/` to `docs/specs/` in DR-068)
+
+| Component | Role |
+|-----------|------|
+| `docs/specs/project/domain.md` | Cumulative domain model (Stage 1 synthesis) |
+| `docs/specs/project/constraints.md` | Cumulative constraint profile (Stage 2 synthesis) |
+| `docs/specs/project/architecture.md` | Cumulative architecture (Stage 3 synthesis) |
+| `docs/specs/project/interfaces.md` | Cumulative interfaces (Stage 4 synthesis) |
+| `docs/specs/knowledge/INDEX.md` | Knowledge base auto-index |
+
+**Key design choices:**
+1. **4 separate files** — Corresponds to Stages 1-4. Enables per-stage independent updates and selective reading over a single file
+2. **Git-based tracking** — `git log project/*.md` = evolution timeline, `git diff` = per-feature changes, record/ = rationale for changes (why)
+3. **Update timing Phase 10.6** — After archive (10.5), before team shutdown (11). Updated as late as possible to be safe against regression/rollback within the spiral
+4. **Additive merge** — Only additions/modifications, no deletions. Deprecated items are marked
+5. **Bootstrap** — First spiral auto-initializes. Can also initialize from existing code via `/swe reverse`
+
+**Consequence:** 4 new templates, 14 existing files modified. Per-feature artifact workflow unchanged — project model is a purely additive layer.
+
+## DR-068: Artifact Storage Migration — `docs/specs/` + Monorepo Support
+
+**Status:** active
+**Date:** 2026-03-06
+**Context:** The Living Project Model (`.swe/project/`) and archive (`.swe/record/`) from v0.19.0 are located in hidden directories, which does not fit with a project's typical documentation structure. Completed specifications and archives naturally belong under `docs/`. Additionally, monorepo environments require independent documentation management per subproject. Since the plugin is not yet public, the transition can be made immediately without backward compatibility burden.
+
+**Decision:** Move completed/cumulative artifacts to `docs/specs/`. Only `.swe/active/` remains as a hidden directory. Support independent paths per monorepo subproject.
+
+| Old | New | Notes |
+|-----|-----|-------|
+| `.swe/project/` | `docs/specs/project/` | Living project model |
+| `.swe/record/` | `docs/specs/record/` | Archived spiral turns |
+| `docs/knowledge/` | `docs/specs/knowledge/` | Knowledge base entries |
+| `.swe/active/` | `.swe/active/` | Unchanged (working dir) |
+
+Monorepo: `packages/{pkg}/docs/specs/{project,record,knowledge}/` + `packages/{pkg}/.swe/active/`
+
+**Key design choices:**
+1. **`docs/specs/` naming** — `docs/swe/` looks SWE-module-specific. `specs/` is the natural container for specification artifacts
+2. **`.swe/active/` retained** — In-progress artifacts should remain gitignored. Moved to `docs/specs/record/` after completion
+3. **Monorepo workspace detection** — Supports pnpm-workspace.yaml, Cargo.toml `[workspace]`, go.work, package.json `workspaces`
+4. **`--package` flag** — Added to all actions in `artifact-lifecycle.sh` and `knowledge-catalog.sh`
+5. **No backward compatibility** — Plugin is unpublished, so old path fallback is unnecessary
+
+**Scope:** 3 scripts (artifact-lifecycle.sh, knowledge-catalog.sh, spiral-state.sh, prepare-release.sh, port-skills.sh) + ~30 files find-replace (commands, agents, skills, templates, references) + data migration (`git mv docs/knowledge/* docs/specs/knowledge/`).
+
+**Consequence:** All completed artifacts are browsable under `docs/` with standard documentation tools. Monorepo projects can operate independent SWE pipelines per subproject. Path conventions in DR-041 and DR-067 updated.
+
+## DR-069: Evaluation Infrastructure — Model Tracking + Dual Hash
+
+**Status:** active
+**Date:** 2026-03-06
+**Context:** Evaluation result JSON did not record Codex model version/effort, making it impossible to distinguish the cause of score changes (file change vs model change). Accurate tracking was needed ahead of the `gpt-5.3-codex` to `gpt-5.4` transition.
+
+**Decision:** Apply three infrastructure improvements simultaneously:
+
+1. **Models structuring** — Change `multi_model.models` from a string array `["claude", "codex"]` to structured objects `[{"name": "claude", "model_id": "claude-opus-4-6"}, {"name": "codex", "model_id": "gpt-5.4", "effort": "xhigh"}]`
+2. **Dual hash** — `content_hash` (file content only) + `eval_hash` (file + model_id + effort). When the file hasn't changed but the score has, this distinguishes whether it's due to model change or evaluator variance
+3. **gpt-5.3-codex to gpt-5.4** — Bulk replacement across all commands and routing tables. `gpt-5.3-codex-spark` retained as a separate model
+
+**Consequence:** Regression causes can be accurately tracked during model transitions. `regression.sh eval-hash` action added. Evaluation JSON schema is backward compatible — existing results without the `eval_hash` field can still be compared using `content_hash`.
+
+## DR-070: Evaluator File-Based Return — Context Protection
+
+**Status:** active
+**Date:** 2026-03-09
+**Context:** In Mode B batch evaluation (8+ components), each background evaluator agent was returning the full markdown report (~3KB) as text, causing main context to explode. The Codex path was already file-based (`invoke-model.sh` returns JSON file + exit code only), but the Claude evaluator path was returning the full report.
+
+**Decision:** Unify the evaluator agent's return pattern:
+
+1. **Mandatory file output** — The evaluator always writes JSON to `.tmp/{session}_{idx}_claude_eval.json` and returns only a compact one-line summary: `"{component_path}: Level {N}, F:{a}/{b} Q:{a}/{b} E:{a}/{b} → {output_path}"`
+2. **Mode branching removed** — Mode A/B/C/D all use the same pattern. Caller reads from file when detailed results are needed
+3. **Write permission** — Added `Write(.tmp/*)` allow in `settings.json` to permit background agent file writes
+
+**Consequence:** Context usage reduced from ~24KB to ~640B (97% reduction) for Mode B with 8 batches. Both Claude/Codex use the same file-based result + minimal return pattern. Write tool added to evaluator agent (JSON output only, scope boundary maintained).
+
+## DR-071: Multi-Model Eval Hash — All Judge Models in Hash
+
+**Status:** active
+**Date:** 2026-03-09
+**Context:** DR-069's `eval_hash` only reflected the external model (Codex) and did not include the Claude model ID. Even when the Claude model changed (e.g., opus-4 to opus-4-6), the eval_hash remained the same, making it impossible to track evaluation condition changes. For single-model evaluation, eval_hash was treated as equal to content_hash, so model information was not reflected in the hash.
+
+**Decision:** Change the `regression.sh eval-hash` interface to variadic arguments:
+
+1. **Variadic model arguments** — `eval-hash <file> <model[:effort]> [<model[:effort]> ...]`. All models used are passed as arguments
+2. **Sort then combine** — Model arguments are alphabetically sorted before inclusion in hash input. Guarantees the same hash regardless of argument order
+3. **Single model also explicit** — `eval-hash file.md claude-opus-4-6` (previously treated as identical to content_hash)
+
+**Examples:**
+- Single: `eval-hash doctor.md claude-opus-4-6`
+- Dual: `eval-hash doctor.md claude-opus-4-6 gpt-5.4:xhigh`
+
+**Consequence:** Any model combination is reflected in eval_hash, enabling accurate tracking of evaluation differences caused by model changes. Recalculated eval_hash for all 46 existing evaluation JSONs using the new method. DR-069's content_hash remains unchanged.

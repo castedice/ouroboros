@@ -1,6 +1,6 @@
 ---
 description: "Stage 4 — Define contracts between components: types, error conditions, invariants (SDD)"
-argument-hint: "<task-description> [--depth Skip|Light|Standard|Deep] [--artifact <architecture-spec-path>]"
+argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <architecture-spec-path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
 
@@ -46,6 +46,10 @@ Otherwise, apply the depth decision matrix from `skills/swe/methodology/referenc
 
 Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
 
+### Fast Mode Skip
+
+When `fast_mode` is active (from `--fast` flag), apply relaxed skip condition: **Skip when the change is within a single module boundary with no public interface changes**. If the task modifies only internal implementation without changing any exported function signatures, types, or event schemas, produce a minimal skip artifact noting "Interface skipped — change within single module boundary" and jump to Phase 6. Otherwise, proceed at Light depth.
+
 ### Skip Handling
 
 If depth is **Skip**: Verify — "Internal refactoring with no interface changes" per `depth-system.md`. If task involves new public APIs, changed function signatures, or new event schemas:
@@ -60,7 +64,7 @@ Otherwise: produce minimal skip artifact noting "No interface changes — intern
 1. **Upstream artifact**: If `--artifact` is provided, read the Architecture Spec
    - Extract component breakdown, data model, and design decisions
    - If artifact is missing: warn "Architecture Spec not found at {path}. Interface design without architecture context risks misaligned contracts. Consider running `/swe design` first."
-2. **Prior artifacts**: Search `.swe/active/` for Context Document and Constraint Profile to inform interface design:
+2. **Prior artifacts**: Search `.swe/active/` for Context Document and Constraint Profile to inform interface design. At Light depth, read summary only (`Read(file, limit: 15)`) per the Selective Load Matrix in `artifact-contracts.md`. At Standard+ depth, read in full:
    - Context Document: domain model, ubiquitous language (for naming interfaces)
    - Constraint Profile: performance constraints (for SLA definitions in contracts), technology constraints (for type system choice)
 3. **Existing interfaces**: Survey codebase for existing interfaces:
@@ -79,8 +83,8 @@ If no Architecture Spec available:
 
 Delegate interface definition to the analyst agent via Task tool:
 
-- **Input**: Task description + Architecture Spec content (if available) + Constraint Profile content (if available) + existing interface patterns + depth level
-- **Instructions**: "Execute Procedure 4 (Interface) at {depth} depth. Follow the template at `templates/swe/interface-contracts.md` — include sections matching the depth markers for this depth level. Always populate the Delta from Design section — if types or signatures changed from the Architecture Spec, document every change with reason. Use named structs for all public return types (no raw tuples). Use precise types — no `any`, no untyped dictionaries. Verify each interface is testable without implementation. At Standard+ depth: include the Test Suggestions section with full implementation detail — constructor signatures with parameter order, source module paths for mock targeting, and parameter style (object vs positional) for each function. These details prevent test-contract mismatches during Stage 5. Return the artifact content as structured markdown."
+- **Input**: Task description + Architecture Spec content (if available) + Constraint Profile content (if available) + existing interface patterns + depth level + Project Context (if `docs/specs/project/interfaces.md` exists, include its `## Summary` section)
+- **Instructions**: "Start your output with a `## Summary` section (3-5 sentences capturing interfaces defined, key type decisions, and notable error conditions), then continue with full content. Execute Procedure 4 (Interface) at {depth} depth. Follow the template at `templates/swe/interface-contracts.md` — include sections matching the depth markers for this depth level. Always populate the Delta from Design section — if types or signatures changed from the Architecture Spec, document every change with reason. Use named structs for all public return types (no raw tuples). Use precise types — no `any`, no untyped dictionaries. Verify each interface is testable without implementation. At Standard+ depth: include the Test Suggestions section with full implementation detail — constructor signatures with parameter order, source module paths for mock targeting, and parameter style (object vs positional) for each function. These details prevent test-contract mismatches during Stage 5. Return the artifact content as structured markdown."
 - **Expected output**: Interface Contracts content (structured markdown)
 
 ### Recovery
@@ -165,6 +169,9 @@ Run Stage 5 (Test) to write tests against these interface contracts:
 - `/swe design "{task}"` — revisit Stage 3 if interface design reveals architecture gaps
 - `/swe spec "{task}"` — run all 4 specification stages in sequence
 - `/swe dev "{task}"` — run Stages 5-8 (development) with these contracts
+- **Analyst agent** (`agents/swe/analyst.md`) — executes interface design
+- **Artifact Contracts** (`skills/swe/methodology/references/artifact-contracts.md`) — stage input/output specifications
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
 ```
 
 ## Rules

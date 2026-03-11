@@ -1,6 +1,6 @@
 ---
 description: Explore ideas through divergent and convergent thinking — generate freely, then evaluate rigorously
-argument-hint: <topic-or-question> [--multi]
+argument-hint: <topic-or-question> [--framework <name>] [--output [path]] [--single]
 allowed-tools: Read, Glob, Grep, Task, Bash
 ---
 
@@ -14,47 +14,62 @@ Target: $ARGUMENTS
 
 | Phase | Agent | Role |
 |-------|-------|------|
-| 3 | brainstormer + Bash background (--multi) | Divergent idea generation + convergent evaluation + ranked recommendations (parallel with Codex + Gemini when --multi) |
+| 3 | brainstormer + Bash background (--multi) | Divergent idea generation + convergent evaluation + ranked recommendations (parallel with Codex when --multi) |
 
 ## Execution Paths
 
 | Flag | Phases | Behavior |
 |------|--------|----------|
 | (default) | 1, 2, 3, 5, 6 | Single-model brainstorm via Claude brainstormer agent |
-| `--multi` | 1, 2, 3, 4, 5, 6 | Parallel Claude + Codex + Gemini brainstorm, cherry-pick merge, multi-model insights section added |
+| `--framework <name>` | 1, 2, 3, 5, 6 | Use a specific process framework (double-diamond, design-thinking, cps, triz, triple-diamond). If omitted, brainstormer auto-selects |
+| `--output [path]` | 1, 2, 3, 5, 6, 7 | Save results to file. Default path: `docs/brainstorms/{date}-{topic-slug}.md`. Adds Phase 7 |
+| `--multi` | 1, 2, 3, 4, 5, 6 | Parallel Claude + Codex brainstorm, cherry-pick merge, multi-model insights section added |
 
 ## Phase 1: Parse Input
 
 Extract topic and options from $ARGUMENTS:
 
 - **Topic**: Everything in $ARGUMENTS except flags. This is the brainstorming question or area to explore.
-- **`--multi`**: Enable multi-model brainstorming in Phase 3 (Claude + Codex + Gemini parallel, cherry-pick merge)
+- **`--framework <name>`**: Use a specific process framework. Valid names: `double-diamond`, `design-thinking`, `cps`, `triz`, `triple-diamond`. If omitted, the brainstormer agent auto-selects based on topic analysis. Invalid names produce a warning and fall back to auto-selection.
+- **`--output [path]`**: Save brainstorm results to a file. If path is provided, use it. If `--output` is present without a path, use default: `docs/brainstorms/{YYYY-MM-DD}-{topic-slug}.md` where topic-slug is the topic lowercased with spaces replaced by hyphens, truncated to 50 chars.
+- **`--single`**: Force single-model mode (skip external CLIs)
+
+By default, multi-model is auto-detected — if codex CLI is installed, it runs in parallel with Claude.
 
 If no argument provided:
 
-- Output error: "Error: No topic specified. Usage: `/brainstorm <topic-or-question> [--multi]`"
+- Output error: "Error: No topic specified. Usage: `/brainstorm <topic-or-question>`"
 - Abort
 
-### CLI Availability Check (only when `--multi`)
+### CLI Availability Check (auto-detect)
+
+Skip if `--single` is specified.
 
 Verify external model infrastructure:
 
-1. Check `codex` and `gemini` CLI availability and versions via Bash: `which codex && codex --version; which gemini && gemini --version`
+1. Check `codex` CLI availability and version via Bash: `which codex && codex --version`
 2. Check `${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh` exists
 3. Ensure `.tmp/` directory exists (create if missing)
 
-Store: `codex_available` (bool + version), `gemini_available` (bool + version).
+Store: `codex_available` (bool + version).
 
 Log availability:
 
-- Both: "Multi-model: Claude + Codex v{ver} + Gemini v{ver}"
-- Codex only: "Multi-model: Claude + Codex v{ver} (Gemini unavailable)"
-- Gemini only: "Multi-model: Claude + Gemini v{ver} (Codex unavailable)"
-- Neither: "No external CLIs found. Proceeding single-model." → disable `--multi` and continue
+- Codex available: "Multi-model: Claude + Codex v{ver}"
+- Codex unavailable: "Single-model mode (no external CLIs found)"
 
 ## Phase 2: Context Gathering
 
 Collect relevant context to ground the brainstorming. The brainstormer agent needs concrete codebase and knowledge base context to produce actionable ideas, not abstract suggestions.
+
+### 2.0: Methodology References
+
+Read brainstorming methodology files to include in the brainstormer's context:
+
+1. **Always read**: `skills/core/brainstorming/references/divergent-techniques.md`, `skills/core/brainstorming/references/convergent-criteria.md`
+2. **Always read**: `skills/core/brainstorming/references/framing-techniques.md`
+3. **If `--framework` specified or topic is complex**: `skills/core/brainstorming/references/process-frameworks.md`
+4. **If topic is high-stakes (strategic, architectural, irreversible)**: `skills/core/brainstorming/references/meta-reflection.md`
 
 ### 2.1: Codebase Context
 
@@ -69,7 +84,7 @@ Based on the topic, gather relevant files:
 
 ### 2.2: Knowledge Base
 
-1. `Glob: docs/knowledge/*.md` — list available entries
+1. `Glob: docs/specs/knowledge/*.md` — list available entries
 2. Scan titles and tags for relevance to the topic
 3. Read up to 3 relevant entries
 
@@ -80,6 +95,9 @@ Compile gathered context into a structured brief:
 ```text
 ## Topic
 {the brainstorming topic/question}
+
+## Framework
+{selected framework name, or "default" if none specified}
 
 ## Codebase Context
 {relevant file summaries — key facts, not full content}
@@ -99,11 +117,12 @@ Compile gathered context into a structured brief:
 
 Launch the **brainstormer** agent via Task tool:
 
-- **Input**: Context brief from Phase 2
+- **Input**: Context brief from Phase 2 + methodology reference files
 - **Instructions**: "Perform Brainstorm Analysis. Read the provided context, select appropriate divergent techniques, generate 8-15 ideas, cluster into themes, apply convergent criteria, and produce a Brainstorm Analysis Report with top 3 ranked recommendations."
+- **Framework hint** (if `--framework` specified): Append to instructions: "Use the {framework-name} process framework. Map its stages to the brainstorming workflow as described in process-frameworks.md."
 - **Expected output**: Brainstorm Analysis Report (ideas table, clusters, convergent assessment, top 3 with rationale)
 
-### When `--multi` is active (parallel with Codex + Gemini):
+### When `--multi` is active (parallel with Codex):
 
 1. **Build brainstormer relay prompt** following `skills/core/routing/references/invocation-protocol.md`:
    - **Section 1 — Role**: You are a creative thinking specialist. Generate diverse ideas through structured divergent thinking techniques, then evaluate and rank them through convergent analysis.
@@ -112,19 +131,17 @@ Launch the **brainstormer** agent via Task tool:
    - **Section 4 — Response Format**: Schema BR from `skills/core/routing/references/relay-response-schemas.md`
    - Save to `.tmp/{SESSION_ID}_brainstorm_relay.txt`
 
-2. **Fan-out** (parallel — up to 3 models):
+2. **Fan-out** (parallel):
 
    **Model selection** (from routing table):
    - Codex: `gpt-5.2` with `high` reasoning effort (general-purpose model, better than codex models for non-coding creative tasks)
-   - Gemini: `gemini-3-pro-preview` (most intelligent Gemini, strong at architecture brainstorming and broad analysis)
 
    Launch all available models simultaneously:
 
-   - **Background 1** (if codex_available): `Bash(invoke-model.sh codex gpt-5.2 .tmp/{SESSION_ID}_brainstorm_relay.txt .tmp/{SESSION_ID}_codex_brainstorm.json high, run_in_background=true)`
-   - **Background 2** (if gemini_available): `Bash(invoke-model.sh gemini gemini-3-pro-preview .tmp/{SESSION_ID}_brainstorm_relay.txt .tmp/{SESSION_ID}_gemini_brainstorm.json, run_in_background=true)`
+   - **Background** (if codex_available): `Bash(invoke-model.sh codex gpt-5.2 .tmp/{SESSION_ID}_brainstorm_relay.txt .tmp/{SESSION_ID}_codex_brainstorm.json high, run_in_background=true)`
    - **Foreground**: Claude brainstormer agent (same delegation as above)
 
-3. **Fan-in**: Collect background results after Claude completes. Handle exit codes per `evaluate.md` Phase 3 Step 3. Collect Codex and Gemini independently — one failure does not block the other
+3. **Fan-in**: Collect background results after Claude completes. Handle exit codes per `evaluate.md` Phase 3 Step 3.
 
 ## Phase 4: Cherry-pick Merge (--multi only)
 
@@ -177,11 +194,10 @@ If multi-model was active, add a section:
 ### Multi-model Insights ({N}-way)
 - **Convergent ideas**: {ideas generated by 2+ models independently — higher confidence}
 - **Unique from Codex**: {ideas or perspectives that only Codex produced}
-- **Unique from Gemini**: {ideas or perspectives that only Gemini produced}
 - **Model count**: Claude + {available external models}
 ```
 
-Omit "Unique from {model}" lines for models that were unavailable.
+Omit "Unique from Codex" line if Codex was unavailable.
 
 ## Phase 6: Report
 
@@ -198,12 +214,37 @@ After presenting results, suggest next actions based on the brainstorming outcom
 
 Tailor the suggestions to the specific top ideas — don't list generic commands. Each suggestion should reference a concrete idea from the brainstorm results.
 
+## Phase 7: Save Output (--output only)
+
+When `--output` is active, write the brainstorm results to a file:
+
+1. **Determine output path**:
+   - If explicit path provided: use it
+   - If `--output` without path: `docs/brainstorms/{YYYY-MM-DD}-{topic-slug}.md`
+   - Create `docs/brainstorms/` directory if it doesn't exist
+
+2. **Build output file** using `templates/core/brainstorm-output.md` as the structure, with added frontmatter:
+
+```yaml
+---
+topic: "{the brainstorming topic}"
+framework: "{framework used or 'default'}"
+date: "{YYYY-MM-DD}"
+tags: [{relevant tags from topic keywords}]
+models: ["{models used, e.g. claude, codex}"]
+---
+```
+
+3. **Write the file** with the full Brainstorm Analysis Report content (ideas table, clusters, convergent assessment, top 3, not-selected section)
+
+4. **Report**: "Brainstorm results saved to `{output-path}`"
+
 ## Rules
 
-- This command produces no file artifacts — all output is conversational. To persist insights, suggest `/research` to formalize as a knowledge entry
+- Without `--output`, this command produces no file artifacts — all output is conversational. With `--output`, results are saved to a file (see Phase 7). To persist insights as a knowledge entry, suggest `/research`
 - The brainstormer agent is read-only — command handles all context gathering (Phase 2) and network access
 - User intuition is a legitimate data point — the brainstormer's ranking is a recommendation, not a decision
 - Do not skip convergence — raw unranked ideas without structured evaluation are not useful output
 - On `--multi` fan-out error, fall back gracefully: 3-way → 2-way → Claude-only (see Phase 4)
-- **Settings requirement**: `--multi` requires `Bash(codex *)` and/or `Bash(gemini *)` in `settings.json` allow list
+- **Settings requirement**: `--multi` requires `Bash(codex *)` in `settings.json` allow list
 - **Temp file lifecycle**: all temp files go to `.tmp/{SESSION_ID}_*`. Clean up at command end: `bash scripts/session.sh cleanup {SESSION_ID}`

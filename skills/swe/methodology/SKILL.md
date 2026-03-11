@@ -44,18 +44,11 @@ Eight stages executed in order. Each stage has a defined purpose, key output, an
 
 ## Depth System Overview
 
-Four depth levels control how much ceremony each stage receives:
+Four depth levels — **Skip**, **Light**, **Standard**, **Deep** — control how much ceremony each stage receives. The default is Standard; deviation requires explicit justification. See `references/depth-system.md` for the full depth decision matrix with scoring factors, decision rules, stage-specific triggers, and escalation rules.
 
-| Level | Effort | Output Form | When |
-|-------|--------|-------------|------|
-| **Skip** | 0 | None | Stage not applicable to this task |
-| **Light** | Minutes | Inline notes, mental checklist | Familiar domain, small change, low risk |
-| **Standard** | Hours | Structured document from template | Default — most tasks |
-| **Deep** | Hours-Days | Comprehensive with diagrams, alternatives analysis | High risk, unfamiliar domain, team impact |
+**Key principle**: Skipping must be a conscious decision ("this stage does not apply because..."), not an omission. Going Deep must be warranted by risk factors, not by perfectionism.
 
-The default is Standard. Deviation in either direction requires justification. Skipping must be a conscious decision ("this stage does not apply because..."), not an omission. Going Deep must be warranted by risk factors, not by perfectionism.
-
-Five factors determine depth: task scope, risk level, domain familiarity, team impact, and reversibility. See `references/depth-system.md` for the full decision matrix with scoring.
+Five factors determine depth: task scope, risk level, domain familiarity, team impact, and reversibility.
 
 ## Composites and Meta-composite
 
@@ -64,6 +57,7 @@ Stages compose into higher-level workflows:
 | Composite | Stages | Purpose |
 |-----------|--------|---------|
 | **spec** | 1-4 (Understand → Interface) | Specification — from problem to contracts |
+| **reverse** | 1-4 (reverse) | Reverse specification — from existing code to contracts |
 | **dev** | 5-8 (Test → Optimize) | Development — from contracts to working code |
 | **ship** | Integration test → Security → Review → Deploy | Release — from code to production |
 | **tune** | Evaluate → Improve → Retrospect | Tuning — from production to learnings |
@@ -93,6 +87,23 @@ Transition between stages follows artifact contracts — each stage's output is 
 
 Backward transitions are permitted when a downstream stage reveals upstream gaps. Document the reason when going backward — it becomes input for the retrospect in tune.
 
+### Traversal Policies
+
+**"Fixed stages, variable traversal."** — The stage sequence never changes, but how the spiral navigates through stages adapts to the task.
+
+Traversal behavior is configured via `--policy` on the spiral command. Each policy defines which transition paths are available and how regression is handled. See `references/spiral-state.md` for the full state machine schema and transition rules.
+
+| Policy | Behavior | Status |
+|--------|----------|--------|
+| **probe** | Light-first exploration → user confidence check → keep Light result or escalate to target depth. Default policy. | Available |
+| **linear** | Direct execution at target depth with user-initiated regression. Max 3 backward transitions per turn. | Available |
+| **team** | Director + 3 Specialists (Shaper/Builder/Critic) execute composites concurrently. Auto-gates enable pipelined start — next composite begins immediately while cross-review validates the previous. See `references/team-execution-pattern.md`. | Available |
+| **team+probe** | Composes team pipelining with probe's adaptive depth. Each specialist runs at Light depth first, then user decides to keep or escalate based on cross-review findings. See `references/team-execution-pattern.md` § Probe Composition Protocol. | Available |
+
+Stage-level parallelism (Security Review ‖ Code Review in Ship, Improve ‖ Retrospect in Tune) is composite-internal — always active at Standard+ depth, independent of traversal policy. Multi-model parallelism (`--multi`) adds Codex reviews alongside Claude. See DR-060. Selective routing (`--route`) delegates specific stages to external models (Codex) via Bridge Agent — team policy only. See DR-062.
+
+The spiral state machine (`spiral-state.json`) tracks execution regardless of policy — it records forward transitions, regressions, checkpoints, and cascade invalidation events.
+
 ## Common Pitfalls
 
 | Pitfall | Stage | Prevention |
@@ -121,7 +132,31 @@ Verify that pipeline methodology is being applied correctly:
 
 ## See Also
 
-- **swe-constraint-methodology** (`skills/swe/constraint/SKILL.md`) — Constraint-first design methodology used by Stage 2 (Constrain) and referenced by Stage 3 (Design)
-- **`/swe spec`** (`commands/swe/spec.md`) — Composite command orchestrating Stages 1-4 (Batch 2)
-- **`/swe dev`** (`commands/swe/dev.md`) — Composite command orchestrating Stages 5-8 (Batch 3)
-- **`/swe spiral`** (`commands/swe/spiral.md`) — Meta-composite orchestrating the full cycle (Batch 6)
+### Commands
+- **`/swe spec`** (`commands/swe/spec.md`) — Composite: Stages 1-4 (Understand → Interface)
+- **`/swe reverse`** (`commands/swe/reverse.md`) — Reverse composite: derive Stages 1-4 artifacts from existing code
+- **`/swe dev`** (`commands/swe/dev.md`) — Composite: Stages 5-8 (Test → Optimize)
+- **`/swe ship`** (`commands/swe/ship.md`) — Composite: Integration → Security → Review → Deploy
+- **`/swe tune`** (`commands/swe/tune.md`) — Composite: Evaluate → Improve → Retrospect
+- **`/swe spiral`** (`commands/swe/spiral.md`) — Meta-composite: spec → dev → ship → tune
+
+### Agents
+- **Analyst** (`agents/swe/analyst.md`) — Specification stages (Understand, Constrain, Design, Interface)
+- **Implementer** (`agents/swe/implementer.md`) — Development stages (Test, Implement, Verify, Optimize)
+- **Reviewer** (`agents/swe/reviewer.md`) — Ship stages (Security Review, Code Review)
+- **Bridge** (`agents/swe/bridge.md`) — External model integration via MCP (Codex delegation)
+
+### References
+- **Depth System** (`skills/swe/methodology/references/depth-system.md`) — Decision matrix, scoring, stage triggers
+- **Pipeline Stages** (`skills/swe/methodology/references/pipeline-stages.md`) — Detailed stage descriptions
+- **Artifact Contracts** (`skills/swe/methodology/references/artifact-contracts.md`) — Stage input/output specifications
+- **Agent Instructions** (`skills/swe/methodology/references/agent-instructions.md`) — Canonical instruction templates
+- **Artifact Wrappers** (`skills/swe/methodology/references/artifact-wrappers.md`) — Output formatting templates
+- **Calibration Examples** (`skills/swe/methodology/references/calibration-examples.md`) — Good/Bad output anchors
+- **Spiral State** (`skills/swe/methodology/references/spiral-state.md`) — State machine schema, transition rules, checkpoint-rewind protocol
+- **Team Execution Pattern** (`skills/swe/methodology/references/team-execution-pattern.md`) — Team topology, specialist prompts, pipelined execution, cross-review, Bridge Agent integration
+
+### Related Skills
+- **Constraint Methodology** (`skills/swe/constraint/SKILL.md`) — Constraint-first design, used by Stage 2
+- **Persuasion** (`skills/swe/persuasion/SKILL.md`) — Structured argumentation for design decisions and code reviews
+- **Teaching** (`skills/core/teaching/SKILL.md`) — Decision-focused knowledge transfer for analysts and onboarding

@@ -47,12 +47,49 @@ Artifacts are stored in two locations based on lifecycle state:
 
 ### Record (Completed Turns)
 
-`.swe/record/{package}/{NNN}-{task-slug}/{NN}-{stage}.md`
+`docs/specs/record/{package}/{NNN}-{task-slug}/{NN}-{stage}.md`
 
 - `{package}`: auto-detected from manifest or "default"
 - `{NNN}`: zero-padded sequential number within package
 - `{task-slug}`: lowercase-hyphenated task description
 - `{NN}-{stage}`: same as active numbering
+
+### Project Model (Living Documents)
+
+`docs/specs/project/{name}.md` — cumulative specification that evolves across spiral turns.
+
+| File | Stage | Content |
+|------|-------|---------|
+| `docs/specs/project/domain.md` | 1 | Cumulative domain model: entities, bounded contexts, ubiquitous language |
+| `docs/specs/project/constraints.md` | 2 | Cumulative constraint profile: all constraints with feature attribution |
+| `docs/specs/project/architecture.md` | 3 | Cumulative architecture spec: components, decisions, patterns |
+| `docs/specs/project/interfaces.md` | 4 | Cumulative interface contracts: module boundaries, types, invariants |
+
+Project model files are initialized via `scripts/artifact-lifecycle.sh init-project` and updated after each spiral turn (Phase 10.6) or standalone tune (Phase 6.5). They serve as context for the next turn's specification stages. The merge is additive — entries are appended or updated, never removed. See DR-067.
+
+### Knowledge Base
+
+`docs/specs/knowledge/{entry}.md` — research entries and accumulated patterns.
+
+| File | Content |
+|------|---------|
+| `docs/specs/knowledge/INDEX.md` | Auto-generated entry table + tag index |
+| `docs/specs/knowledge/{topic}.md` | Individual knowledge entries with YAML frontmatter |
+
+Knowledge entries are created via `/core absorb` and indexed via `scripts/knowledge-catalog.sh index`.
+
+### Monorepo Layout
+
+In monorepo workspaces, artifacts are scoped per subproject:
+
+| Scope | Active | Specs |
+|-------|--------|-------|
+| Root (repo-wide) | `.swe/active/` | `docs/specs/` |
+| Subproject | `packages/{pkg}/.swe/active/` | `packages/{pkg}/docs/specs/` |
+
+Each subproject maintains independent `project/`, `record/`, and `knowledge/` directories. Root-level docs contain only repo-wide cross-cutting concerns.
+
+**Cross-cutting artifacts**: When work primarily affects one subproject but impacts others, the artifact includes an `**Affects**: [pkg1, pkg2]` header field. Affected subprojects receive a link stub in their record pointing to the primary artifact.
 
 ## Per-Stage Contracts
 
@@ -168,6 +205,48 @@ Artifacts are stored in two locations based on lifecycle state:
 | Remaining Tech Debt | As needed | Known issues deferred with rationale |
 
 **Consumed by**: tune retrospect (performance data, tech debt backlog)
+
+## Artifact Summary Convention
+
+Every artifact must start with a `## Summary` section (3-5 sentences) immediately after the metadata header. This summary enables downstream stages to load only the summary when full content is not required, reducing context window consumption.
+
+```markdown
+# {Artifact Title}: {task summary}
+
+**Stage**: {N} — {Name}
+**Depth**: {depth}
+...
+
+---
+
+## Summary
+> {3-5 sentences: key decisions, primary outputs, critical findings}
+
+## Full Content
+...
+```
+
+Agent instructions must include: "Start your output with a `## Summary` section (3-5 sentences capturing the key decisions and outputs), then continue with the full content."
+
+## Selective Load Matrix
+
+Downstream stages can load upstream artifacts as **full** (entire content) or **summary** (first ~15 lines, covering the Summary section). At Light depth, optional artifacts load as summary only to conserve context window.
+
+| Downstream Stage | Required (always full) | Optional (summary at Light depth) |
+|------------------|------------------------|-----------------------------------|
+| S2 Constrain | S1 Context Document | — |
+| S3 Design | S2 Constraint Profile | S1 Context Document |
+| S4 Interface | S3 Architecture Spec | S1 Context Document, S2 Constraint Profile |
+| S5 Test | S4 Interface Contracts | S3 Architecture Spec |
+| S6 Implement | S4 Interface Contracts, S5 Test Suite | S1 Context Document, S2 Constraint Profile, S3 Architecture Spec |
+| S7 Verify | S4 Interface Contracts, S6 Implementation | S1 Context Document, S2 Constraint Profile, S3 Architecture Spec, S5 Test Suite |
+| S8 Optimize | S2 Constraint Profile, S3 Architecture Spec, S7 Verification | S1 Context Document, S4 Interface Contracts, S5 Test Suite, S6 Implementation |
+
+**Loading rules**:
+
+- **Required** artifacts → always read in full (`Read(file)`)
+- **Optional** artifacts at Standard/Deep depth → read in full
+- **Optional** artifacts at Light depth → read summary only (`Read(file, limit: 15)`)
 
 ## Contract Quality Gates
 

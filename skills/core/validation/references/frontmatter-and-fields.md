@@ -173,12 +173,49 @@ description: Generate implementation plan for a task
 
 ### Valid Event Types
 
+Claude Code supports 17 hook events across 4 categories:
+
+**Session lifecycle:**
+
+| Event | When It Fires | Common Use |
+|---|---|---|
+| `SessionStart` | Session begins, resumes, or context reloads | Context injection, status display |
+| `SessionEnd` | Session closes (only `command` type hooks) | Cleanup, state persistence |
+| `Stop` | Agent completes a turn | Completion checks, status updates |
+
+**Tool lifecycle:**
+
 | Event | When It Fires | Common Use |
 |---|---|---|
 | `PreToolUse` | Before a tool executes | Security validation, permission checks |
-| `PostToolUse` | After a tool completes | Auto-formatting, logging |
-| `Stop` | When the agent stops | Completion checks, cleanup |
+| `PostToolUse` | After a tool completes successfully | Auto-formatting, logging |
+| `PostToolUseFailure` | After a tool fails | Error tracking, recovery |
+| `PermissionRequest` | Tool requires user permission | Auto-approval policies |
+
+**User interaction:**
+
+| Event | When It Fires | Common Use |
+|---|---|---|
 | `UserPromptSubmit` | When user submits a prompt | Context injection, mode setting |
+| `Notification` | When a notification is generated | Custom alerting |
+| `PreCompact` | Before context compaction | State preservation, summary generation |
+
+**Agent and team:**
+
+| Event | When It Fires | Common Use |
+|---|---|---|
+| `SubagentStart` | When a subagent spawns | Monitoring, configuration |
+| `SubagentStop` | When a subagent completes | Output capture, result logging |
+| `TeammateIdle` | When a teammate goes idle | Work assignment, coordination |
+| `TaskCompleted` | When a task is marked completed | Progress tracking |
+
+**Configuration and workspace:**
+
+| Event | When It Fires | Common Use |
+|---|---|---|
+| `ConfigChange` | When configuration changes | Setting validation |
+| `WorktreeCreate` | When a git worktree is created | Workspace setup |
+| `WorktreeRemove` | When a git worktree is removed | Workspace cleanup |
 
 ### Timeout Guidelines
 

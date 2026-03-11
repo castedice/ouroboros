@@ -262,3 +262,12 @@ Use this checklist to verify that evaluation methodology is being applied correc
 - [ ] Improvements tagged with [HIGH/MED/LOW] priorities
 - [ ] For before/after: position swap performed with consistency check
 - [ ] Report follows the standard per-tier format
+
+## See Also
+
+- **evaluator agent** (`agents/core/evaluator.md`) — Primary consumer; executes this skill's workflow directly for tiered scoring and report generation
+- **evaluate command** (`commands/core/evaluate.md`) — Orchestrates Phase 3-6 evaluation pipeline, invokes evaluator agent, manages multi-model coordination
+- **evolve command** (`commands/core/evolve.md`) — Phase 6 quality gate; uses before/after pairwise comparison to validate improvements
+- **absorb command** (`commands/core/absorb.md`) — Phase 8 quality gate; evaluates generated components before finalizing absorption
+- **upgrade command** (`commands/core/upgrade.md`) — Phase 7 validation; evaluates reconciled components to verify no quality regression
+- **validation-methodology** (`skills/core/validation/SKILL.md`) — Structural correctness checks that run before evaluation; evaluation assumes validation has passed

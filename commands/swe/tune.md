@@ -1,12 +1,12 @@
 ---
 description: "Tune composite — orchestrate Evaluate, Improve, and Retrospect to refine code quality and extract learnings for the next spiral turn"
-argument-hint: "<task-description> [--depth <global|per-stage>] [--artifact <ship-report-path>]"
+argument-hint: "<task-description> [--fast] [--depth <global|per-stage>] [--artifact <ship-report-path>] [--single]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Task, Bash
 ---
 
 # Tune — Tune Composite (Feedback Pipeline)
 
-Orchestrate the 3 tune stages sequentially — Evaluate, Improve, Retrospect — to refine code quality and produce learnings that feed the next spiral turn.
+Orchestrate the tune stages — Evaluate, Improve ‖ Retrospect — to refine code quality and produce learnings that feed the next spiral turn. At Standard+ depth, Improve and Retrospect execute as parallel Tasks (different file domains, no conflict).
 
 Target: $ARGUMENTS
 
@@ -15,8 +15,7 @@ Target: $ARGUMENTS
 | Phase | Agent | Role |
 |-------|-------|------|
 | 3 | core evaluator | Code quality evaluation (SWE-adapted) |
-| 4 | implementer | Code improvement based on evaluation findings |
-| 5 | core researcher | Artifact chain analysis, pattern extraction, learning documentation |
+| 4 | implementer + researcher | Improve ‖ Retrospect (parallel Tasks at Standard+ depth) |
 
 ## Phase 1: Parse Input
 
@@ -25,26 +24,25 @@ Extract from $ARGUMENTS:
 | Parameter | Source | Default |
 |-----------|--------|---------|
 | `task` | Positional text (everything not a flag) | Required — abort if empty |
+| `--fast` | Shortcut for `--depth Light` with relaxed skip conditions | Off |
 | `--depth` | Depth specification | Standard (global) |
 | `--artifact` | Path to Ship Report or entry artifact | None (auto-discovered) |
+| `--single` | Force single-model mode (skip external CLIs). Multi-model auto-detected by default | — |
+
+**`--fast` mode**: Sets all stages to Light depth and enables relaxed skip conditions. If both `--fast` and `--depth` are present, `--depth` takes precedence.
 
 `--depth` accepts two formats:
 
 | Format | Example | Meaning |
 |--------|---------|---------|
-| Global | `--depth Deep` | All 3 tune stages at Deep depth |
+| Global | `--depth Deep` | All tune stages at Deep depth |
 | Per-stage | `--depth E:Std I:Std R:Deep` | Individual stage depths (E=Evaluate, I=Improve, R=Retrospect) |
 
-Parsing rules:
-
-- If single word (Light/Standard/Deep): apply to all 3 stages
-- If colon-separated pairs: parse each. Missing stages default to Standard
-- If any stage abbreviation is invalid: error and abort
-- If any depth value is invalid: error and abort
+Parsing rules per `skills/swe/methodology/references/depth-system.md`: single word applies globally, colon-separated pairs apply per-stage (missing stages default to Standard). Invalid abbreviations or values abort with error.
 
 If `task` is empty:
 
-- Output: "Error: Task description required. Usage: `/swe tune <task-description> [--depth <global|E:level I:level R:level>] [--artifact <path>]`"
+- Output: "Error: Task description required. Usage: `/swe tune <task-description> [--depth <global|E:level I:level R:level>] [--artifact <path>] [--multi]`"
 - Abort
 
 ### Artifact Resolution
@@ -64,14 +62,39 @@ If no entry artifact found:
 - Output: "Warning: No upstream artifact found. Tune will operate on codebase state only. For best results, run `/swe ship` or `/swe dev` first."
 - Proceed with reduced context
 
+### Multi-Model Setup (auto-detect)
+
+Skip if `--single` is specified.
+
+1. **CLI availability check**: Check `codex` CLI availability and version via Bash. Store: `codex_available` (bool + version), `failure_count: 0`.
+2. **Session temp directory**: If codex available, initialize session temp directory (`.tmp/{SESSION_ID}_*` pattern).
+
+Log availability:
+
+- Codex found: "Multi-model: Claude + Codex v{ver}"
+- Codex not found: "Single-model mode (no external CLIs found)"
+
+### Decision Matrix
+
+| Condition | Evaluate | Improve | Retrospect | Multi-Model |
+|-----------|----------|---------|------------|-------------|
+| Standard (default) | Run | Run | Run | Off |
+| `--fast` / Light | Run | **Skip** | Run | Off |
+| Deep | Run (Deep) | Run (Deep) | Run (Deep) | Off |
+| `--multi` | Run + Codex | Run | Run | Evaluate only |
+| `--multi` + Light | Run + Codex | **Skip** | Run | Evaluate only |
+| Clean evaluation | Run | **Skip** | Run | — |
+| No source code | **Skip** | **Skip** | Run (artifact-only) | — |
+
 ## Phase 2: Depth Planning
 
 1. If `--depth` was provided, use parsed values
-2. If no `--depth`, apply depth defaults:
+2. If `--fast` was provided (and no `--depth`), set all stages to Light and enable `fast_mode=true` — skip depth analysis
+3. If neither, apply depth defaults:
    - Evaluate: Standard for production code; Light for internal tooling
    - Improve: Standard when evaluation produces actionable findings; Light when evaluation is clean
    - Retrospect: Light for simple tasks; Standard for multi-stage pipelines; Deep for projects with recurring patterns
-3. Build Depth Plan:
+4. Build Depth Plan:
 
 ```text
 Depth Plan: E:{level} I:{level} R:{level}
@@ -94,12 +117,14 @@ Proceed with this plan, or adjust depths?
 
 ## Phase 3: Evaluate
 
-Evaluate code quality by delegating to the core evaluator agent:
+Evaluate code quality by delegating to the core evaluator agent.
+
+### Single-Model Evaluate (default)
 
 > Agent: **core evaluator** (via Task tool with `subagent_type: "ouroboros:core:evaluator"`)
 
 - **Input**: Source code file paths + upstream artifact chain (Constraint Profile for quality boundaries, Interface Contracts for contract adherence, Verification Report for known issues, Ship Report for review findings) + depth level
-- **Instructions**: "Evaluate the implementation quality of the source code for the task: {task}. Apply SWE-adapted criteria: Does the code satisfy its interface contracts? Does it respect constraint boundaries? Is the TDD cycle evidence complete (Red state → Green state → verified)? Is the code minimal — no gold-plating beyond what constraints require? Rate quality on a scale and produce specific improvement recommendations."
+- **Instructions**: Follow the Evaluate instruction template from `skills/swe/methodology/references/agent-instructions.md`. Bind: task={task}.
 - **Expected output**: Quality assessment with specific improvement targets
 
 1. Gather source code files and upstream artifacts from `.swe/active/`
@@ -107,68 +132,90 @@ Evaluate code quality by delegating to the core evaluator agent:
 3. Collect quality assessment and improvement recommendations
 4. Log: "Evaluate complete. Quality: {rating}. {n} improvement targets identified."
 
+### Multi-Model Evaluate (--multi only)
+
+When `--multi` is active, run Claude and Codex evaluations in parallel:
+
+1. **Build relay prompt**: Construct SWE Quality Evaluate relay prompt using the template from `skills/swe/methodology/references/swe-relay-prompts.md`. Save to `.tmp/{SESSION_ID}_eval_relay.txt`.
+
+2. **Fan-out** (per `skills/core/routing/references/parallel-execution-pattern.md`):
+   - Background: Codex evaluator via `scripts/invoke-model.sh` (relay → `_codex_eval.json`)
+   - Foreground: Claude core evaluator (same Task as single-model above)
+
+3. **Fan-in**: After Claude evaluator completes, collect Codex background result. Handle by exit code per parallel-execution-pattern.md.
+
+4. **Consensus**: Merge improvement targets per `skills/core/routing/references/consensus-protocol.md` — union unique targets, use higher priority for shared targets. Log agreement rate.
+
 ### Phase 3 Recovery
 
 | Failure | Action |
 |---------|--------|
-| Agent timeout/error | Retry once with simplified instruction: "List the top 3 code quality issues in {primary source file}." If retry fails: proceed to Phase 5 (Retrospect) — improvement without evaluation targets is lower value |
-| No source code found | Error: "No source code found for evaluation." Proceed to Phase 5 with artifact-only retrospect |
-| Clean evaluation (no findings) | Log: "Code quality is satisfactory. No improvements needed." Skip Phase 4, proceed to Phase 5 |
+| Agent timeout/error | Retry once with simplified instruction: "List the top 3 code quality issues in {primary source file}." If retry fails: proceed to Phase 4 (Retrospect only) — improvement without evaluation targets is lower value |
+| No source code found | Error: "No source code found for evaluation." Proceed to Phase 4 with artifact-only retrospect |
+| Clean evaluation (no findings) | Log: "Code quality is satisfactory. No improvements needed." Skip Improve in Phase 4, proceed with Retrospect only |
+| Codex background fails (--multi) | Skip Codex results. Claude evaluation is always sufficient |
 
-## Phase 4: Improve
+## Phase 4: Improve ‖ Retrospect
 
-Improve code based on evaluation findings by delegating to the implementer agent:
+At Standard+ depth (when Improve runs), Improve and Retrospect execute as parallel Tasks — Improve modifies source code while Retrospect analyzes the artifact chain. These operate on different file domains (source code vs. `.swe/active/` artifacts) with no conflict. At Light depth, only Retrospect runs (Improve is skipped).
+
+### Parallel Execution (Standard+ depth)
+
+Fan-out: Launch both stages simultaneously as independent Tasks.
+
+**Task 1 — Improve** (implementer agent):
 
 > Agent: **implementer** (via Task tool with `subagent_type: "ouroboros:swe:implementer"`)
 
 - **Input**: Evaluation findings + source code files + test suite + depth level for Improve
-- **Instructions**: "Apply the following code improvements identified by evaluation: {improvement targets}. For each improvement: apply the change, run the test suite to confirm Green state is maintained, document what changed and why. Do not introduce new features — only improve existing code quality."
+- **Instructions**: Follow the Improve instruction template from `skills/swe/methodology/references/agent-instructions.md`. Bind: improvement_targets={improvement targets from Phase 3}.
 - **Expected output**: Modified source code + improvement summary + Green state confirmation
 
+Steps:
 1. Extract improvement targets from Phase 3 evaluation
 2. Prioritize: correctness fixes first, then performance, then readability
 3. Delegate to implementer with improvement targets and test suite
 4. Run full test suite via Bash to independently confirm Green state
 5. Log: "Improve complete. {n} improvements applied. Tests: {pass}/{total} passing."
 
-### Phase 4 Recovery
-
-| Failure | Action |
-|---------|--------|
-| Agent timeout/error | Retry once with reduced scope: "Apply only the top improvement." If retry fails: log warning, proceed to Phase 5 with partial results |
-| Test regression after improvement | Revert the failing improvement. Log: "Improvement {n} caused regression — reverted." Continue with remaining improvements |
-| All improvements cause regressions | Revert all. Log: "No improvements could be applied without regression. Proceeding to Retrospect." |
-
-### Light Depth Behavior
-
-At Light depth, skip Improve entirely. Log: "Improve skipped (Light depth). Proceeding to Retrospect."
-
-## Phase 5: Retrospect
-
-Analyze the full artifact chain and extract learnings by delegating to the core researcher agent:
+**Task 2 — Retrospect** (core researcher agent):
 
 > Agent: **core researcher** (via Task tool with `subagent_type: "ouroboros:core:researcher"`)
 
-- **Input**: Full artifact chain from `.swe/active/` + evaluation results + improvement results + Ship Report findings + depth level
-- **Instructions**: "Analyze the complete artifact chain for task: {task}. Extract: (1) Patterns — recurring approaches that worked well, (2) Learnings — what was discovered during the engineering process, (3) Decisions — key choices made and their rationale, (4) Improvements — what could be done better next time. At Standard+ depth, identify specific process improvements and evaluate depth accuracy for each stage that ran in this turn: compare the planned depth against the actual effort needed, mark as Over (too much ceremony — depth could have been lower), Under (gaps found that higher depth would have caught), or Correct, and in Notes explain what would have changed with different depth. Reference the Depth Accuracy section in the retrospect-report template. At Deep depth, track metrics and suggest next-cycle specifications."
+- **Input**: Full artifact chain from `.swe/active/` + evaluation results from Phase 3 + depth level
+- **Instructions**: Follow the Retrospect instruction template from `skills/swe/methodology/references/agent-instructions.md`. Bind: task={task}.
 - **Expected output**: Retrospect analysis with patterns, learnings, decisions, and improvement suggestions
 
+Steps:
 1. Gather all artifacts from `.swe/active/` for this task
-2. Include evaluation results from Phase 3 and improvement results from Phase 4
+2. Include evaluation results from Phase 3
 3. Delegate to core researcher
 4. Collect retrospect analysis
 5. Log: "Retrospect complete. {n} patterns, {m} learnings, {k} next-cycle suggestions extracted."
 
-### Phase 5 Recovery
+Fan-in: Both Tasks produce independent results. Merge into Phase 5 (Feedback Synthesis):
+- Improve results: code changes applied, Green state status
+- Retrospect results: patterns, learnings, next-cycle suggestions
+- Retrospect runs without Improve results when parallel — this is acceptable because Retrospect primarily analyzes the artifact chain (01-09), not the improvements. Feedback Synthesis integrates both.
+
+### Light Depth Behavior
+
+At Light depth, skip Improve entirely. Execute Retrospect only (single Task, no parallelism). Log: "Improve skipped (Light depth). Proceeding to Retrospect."
+
+### Recovery
 
 | Failure | Action |
 |---------|--------|
-| Agent timeout/error | Retry once with simplified instruction: "List top 3 learnings from the artifacts in .swe/active/." If retry fails: produce minimal retrospect from available data |
-| No artifacts found | Produce minimal retrospect based on evaluation and improvement results only |
+| Improve Task fails | Retry once with reduced scope: "Apply only the top improvement." If retry fails: log warning, proceed with Retrospect results only |
+| Retrospect Task fails | Retry once with simplified instruction: "List top 3 learnings from the artifacts in .swe/active/." If retry fails: produce minimal retrospect from available data |
+| Both Tasks fail | Retry each once. If both retries fail: produce minimal retrospect from evaluation results only |
+| Test regression after improvement | Revert the failing improvement. Log: "Improvement {n} caused regression — reverted." Continue with remaining improvements |
+| All improvements cause regressions | Revert all. Log: "No improvements could be applied without regression." Retrospect results remain valid |
+| No artifacts found for Retrospect | Produce minimal retrospect based on evaluation results only |
 
-## Phase 6: Feedback Synthesis
+## Phase 5: Feedback Synthesis
 
-Synthesize retrospect findings into actionable input for the next spiral turn:
+Synthesize results from both Improve and Retrospect into actionable input for the next spiral turn:
 
 ### Next-Cycle Suggestions
 
@@ -203,7 +250,33 @@ From the retrospect analysis, extract:
 At Light depth: produce only the "Suggested Next Task" section.
 At Deep depth: include all sections plus metrics tracking (lines changed, test count delta, finding counts across pipeline stages).
 
-## Phase 7: Review
+### Learning Delta Generation (team policy spiral only)
+
+When tune is running inside a spiral with team or team+probe policy (detected by: `.swe/active/spiral-state.json` exists and policy contains "team"), generate a structured learning delta for cross-turn optimization:
+
+1. **Extract calibration signals** from the retrospect analysis:
+   - Depth calibration: was each composite over-engineered ("over") or under-specified ("under") or well-matched ("ok")?
+   - Team effectiveness: how valuable were cross-reviews? How many backtracks occurred?
+   - Process improvements: specific suggestions for the next turn's team workflow
+
+2. **Save delta**: `Bash: scripts/spiral-state.sh learning-delta save`
+
+   Content written to `.swe/active/learning-delta.json`:
+
+   ```json
+   {
+     "turn": 1,
+     "depth_calibration": { "spec": "ok", "dev": "under", "ship": "ok", "tune": "over" },
+     "team_effectiveness": { "cross_review_value": "high", "backtrack_count": 0, "specialist_failures": 0 },
+     "process_improvements": ["Builder should pre-analyze test infrastructure", "Critic early scan was not timely enough"]
+   }
+   ```
+
+3. **Log**: "Learning delta saved for next turn."
+
+Skip this step when tune is not running inside a team spiral (standalone tune or linear/probe spiral).
+
+## Phase 6: Review
 
 Present the complete tune results:
 
@@ -230,48 +303,61 @@ Present the complete tune results:
 | 4 | Feedback synthesis | {done/skipped} |
 
 ### Feedback for Next Cycle
-{Summary of next-cycle suggestions from Phase 6}
+{Summary of next-cycle suggestions from Phase 5}
+```
+
+When `--multi` is active, append to the report:
+
+```markdown
+### Multi-Model Evaluation Summary
+
+| Model | Quality Rating | Improvement Targets | Agreement |
+|-------|---------------|--------------------|-----------|
+| Claude | {rating} | {n} | — |
+| Codex | {rating} | {m} | {rate}% |
+
+Consensus improvement targets used for Improve phase.
 ```
 
 Write Retrospect Report to `.swe/active/10-tune.md` following the template at `templates/swe/retrospect-report.md`.
 
-## Phase 7.5: Archive
+## Phase 6.5: Archive
 
 After the Retrospect Report is written, archive the current turn's artifacts to the record directory.
 
 1. Derive task slug from the tune report's task summary (lowercase, hyphens, max 30 chars)
-2. Run via Bash: `scripts/artifact-lifecycle.sh archive "{slug}" [--package {pkg}]`
-   - Package is derived automatically from manifest detection
-   - If archive fails (exit code 2): warn user but do not abort — artifacts remain in active/
-3. Log: "Archived turn to `.swe/record/{package}/{NNN}-{slug}/`"
+2. Archive via `scripts/artifact-lifecycle.sh archive "{slug}"`. If archive fails: warn user but do not abort — artifacts remain in active/
+3. Log: "Archived turn to `docs/specs/record/{package}/{NNN}-{slug}/`"
 
-### Archive Skip Condition
+### Archive Skip Conditions
 
-If `.swe/active/` is empty or does not exist, skip archival silently. This handles the case where tune is run standalone on already-archived artifacts.
+- If `.swe/active/` is empty or does not exist, skip archival silently. This handles the case where tune is run standalone on already-archived artifacts.
+- If `.swe/active/spiral-state.json` exists, skip archival — tune is running inside a spiral, and the spiral's Phase 10.5 will handle archiving after finalizing the state machine. Archiving here would move the state file before spiral can mark tune as completed.
 
-## Phase 8: Report
+### Project Model Update (standalone only)
 
-```markdown
-## Tune Complete: {task summary}
+If archive succeeded AND `spiral-state.json` does NOT exist (standalone mode), update the project model with this turn's findings. Follow the same merge logic as `spiral.md` Phase 10.6:
 
-**Depth Plan**: E:{level} I:{level} R:{level}
-**Artifacts**: tune report in `.swe/active/`
+1. If `docs/specs/project/` does not exist: run `Bash: scripts/artifact-lifecycle.sh init-project`
+2. Read archived artifacts' `## Summary` sections from the archive path
+3. Merge into project model files, update Summary and Change Log
+4. Skip if running inside a spiral — spiral handles this at Phase 10.6
 
-### Next Steps
-- Start next spiral turn: `/swe spiral "{next task from feedback}"`
-- Revisit specification with new constraints: `/swe spec "{task}"`
-- Apply specific improvements: `/swe implement "{task}"`
+## Phase 7: Report
 
-### Full Pipeline Reference
-- `/swe spec "{task}"` — specification (Stages 1-4)
-- `/swe dev "{task}"` — development (Stages 5-8)
-- `/swe ship "{task}"` — release validation
-- `/swe spiral "{task}"` — full engineering cycle
+Summary of Phase 6 with actionable next steps:
 
-### Spiral Feedback
-The retrospect analysis suggests the following focus for the next turn:
-{next-cycle suggestion from Phase 6}
-```
+- **Next spiral**: `/swe spiral "{next task from feedback}"` — uses Phase 5 suggestion
+- **Revisit spec**: `/swe spec "{task}"` (with new constraints from retrospect)
+- **Direct fix**: `/swe implement "{task}"` (apply specific improvements)
+- **Pipeline**: `/swe dev`, `/swe ship`, `/swe spiral` for other stages
+
+### See Also
+- **Core Evaluator** (`agents/core/evaluator.md`) — executes code quality evaluation
+- **Implementer agent** (`agents/swe/implementer.md`) — executes code improvements
+- **Core Researcher** (`agents/core/researcher.md`) — executes retrospect analysis
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
+- **SWE Relay Prompts** (`skills/swe/methodology/references/swe-relay-prompts.md`) — external model evaluation templates
 
 ## Rules
 
@@ -279,11 +365,9 @@ The retrospect analysis suggests the following focus for the next turn:
 - Core module agents (evaluator, researcher) are used via Task tool — no SWE-specific agents created for evaluation or retrospect
 - The implementer agent handles code improvements — the command does not modify code directly
 - Artifact paths follow `.swe/active/10-tune.md` convention
-- User checkpoint occurs at Phase 7 (Review) — individual stages do not pause for user review when run as part of tune
-- At Light depth, Improve (Phase 4) is skipped — only a quick retrospect is produced
+- User checkpoint occurs at Phase 6 (Review) — individual stages do not pause for user review when run as part of tune
 - Green state invariant: any code improvements must maintain the existing test suite Green state
-- Failure isolation: each stage can fail independently. Evaluation failure skips improvement. Retrospect runs regardless
-- The tune composite consumes Ship Report as its preferred entry artifact, but can operate with any upstream artifact
-- The tune composite produces a Retrospect Report consumed by the spiral meta-composite for next-turn seeding
+- Failure isolation: each stage can fail independently. Evaluation failure skips improvement. Retrospect runs regardless of Improve outcome
+- The tune composite consumes Ship Report as its preferred entry artifact and produces a Retrospect Report consumed by the spiral meta-composite for next-turn seeding
 - Feedback synthesis connects the output of this cycle to the input of the next — the spiral's self-improving mechanism
 - Graceful degradation: missing artifacts reduce retrospect depth but do not abort. Missing evaluation skips improvement but retrospect still runs

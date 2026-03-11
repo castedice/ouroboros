@@ -47,7 +47,7 @@ Identify root causes of quality gaps. Surface-level fixes lead to regression; ro
 
 1. Researcher agent reads the target component and evaluation report
 2. For each 0-score criterion: Observe → Diagnose → Prescribe
-3. Search knowledge base (`docs/knowledge/`) for relevant patterns
+3. Search knowledge base (`docs/specs/knowledge/`) for relevant patterns
 4. Produce Improvement Analysis Report with prioritized recommendations
 
 ### Inputs / Outputs

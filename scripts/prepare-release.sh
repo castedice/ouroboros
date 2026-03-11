@@ -1,23 +1,46 @@
 #!/usr/bin/env bash
 # prepare-release.sh — Extract plugin deliverables for public release
 #
-# Usage: bash scripts/prepare-release.sh [TARGET_DIR]
+# Usage: bash scripts/prepare-release.sh [--force] [TARGET_DIR]
 # Default target: ../ouroboros-release/
 #
-# Copies only the plugin deliverables (no dev/ internals, no experiments,
-# no session artifacts). The resulting directory is ready to initialize
-# as a separate git repo and push to GitHub.
+# Copies plugin deliverables + curated dev docs. The resulting directory
+# is ready to initialize as a separate git repo and push to GitHub.
+#
+# Options:
+#   --force  Remove existing target directory before extracting
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TARGET="${1:-$(dirname "$PLUGIN_ROOT")/ouroboros-release}"
+
+# Parse arguments
+FORCE=false
+TARGET=""
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE=true ;;
+    *) TARGET="$arg" ;;
+  esac
+done
+TARGET="${TARGET:-$(dirname "$PLUGIN_ROOT")/ouroboros-release}"
 
 if [[ -d "$TARGET" ]]; then
-  echo "Error: Target directory already exists: $TARGET"
-  echo "Remove it first or specify a different path."
-  exit 1
+  if [[ "$FORCE" == true ]]; then
+    # Preserve .git/ to keep existing remote/history
+    if [[ -d "$TARGET/.git" ]]; then
+      echo "Cleaning target (preserving .git/)..."
+      find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+    else
+      echo "Cleaning target..."
+      rm -rf "$TARGET"
+    fi
+  else
+    echo "Error: Target directory already exists: $TARGET"
+    echo "Use --force to replace, or specify a different path."
+    exit 1
+  fi
 fi
 
 echo "=== Ouroboros Release Preparation ==="
@@ -42,29 +65,69 @@ done
 # Root files
 cp "$PLUGIN_ROOT/CLAUDE.md" "$TARGET/"
 cp "$PLUGIN_ROOT/README.md" "$TARGET/"
+cp "$PLUGIN_ROOT/CHANGELOG.md" "$TARGET/"
 cp "$PLUGIN_ROOT/LICENSE" "$TARGET/"
 cp "$PLUGIN_ROOT/.gitignore" "$TARGET/"
 cp "$PLUGIN_ROOT/.editorconfig" "$TARGET/"
 cp "$PLUGIN_ROOT/.rumdl.toml" "$TARGET/"
 cp "$PLUGIN_ROOT/.shellcheckrc" "$TARGET/"
+cp "$PLUGIN_ROOT/AGENTS.md" "$TARGET/"
 
-# Selected dev docs (architecture + decisions only)
+# Dev docs — operational documents referenced by CLAUDE.md, AGENTS.md, hooks, and commands
+mkdir -p "$TARGET/dev"
+cp "$PLUGIN_ROOT/dev/VISION.md" "$TARGET/dev/"
+cp "$PLUGIN_ROOT/dev/DECISIONS.md" "$TARGET/dev/"
+# Starter templates for contributors
+cat >"$TARGET/dev/STATUS.md" <<'STATUSEOF'
+## State: Initial setup
+
+Describe current project state here.
+
+## Immediate Next
+
+> List next tasks here.
+
+## Backlog
+
+- [ ] ...
+STATUSEOF
+cat >"$TARGET/dev/PLAN.md" <<'PLANEOF'
+# Ouroboros — Development Plan
+
+## Current Version
+
+See `CHANGELOG.md` for release history.
+
+## Backlog
+
+- [ ] ...
+PLANEOF
+
+# Curated public documentation
 mkdir -p "$TARGET/docs"
-cp "$PLUGIN_ROOT/dev/VISION.md" "$TARGET/docs/"
-cp "$PLUGIN_ROOT/dev/DECISIONS.md" "$TARGET/docs/"
+cp "$PLUGIN_ROOT/docs/ROADMAP.md" "$TARGET/docs/"
 
-# Knowledge entries (curated, useful for users)
-if [[ -d "$PLUGIN_ROOT/docs/knowledge" ]]; then
-  cp -r "$PLUGIN_ROOT/docs/knowledge" "$TARGET/docs/"
+# Design documents
+if [[ -d "$PLUGIN_ROOT/docs/designs" ]]; then
+  mkdir -p "$TARGET/docs/designs"
+  cp "$PLUGIN_ROOT/docs/designs/v0.15.0-spiral-analysis.md" "$TARGET/docs/designs/" 2>/dev/null || true
 fi
 
-# Clean up internal-only files from target
-# Remove experiment scripts with hardcoded paths
-find "$TARGET" -name "*.json.raw" -delete 2>/dev/null || true
-find "$TARGET" -name "*.log" -path "*/experiments/*" -delete 2>/dev/null || true
+# Experiment analysis reports (refined for public release)
+mkdir -p "$TARGET/docs/experiments"
+for analysis in self-eval-bias model-optimization unanimous-convergence; do
+  if [[ -f "$PLUGIN_ROOT/docs/experiments/${analysis}.md" ]]; then
+    cp "$PLUGIN_ROOT/docs/experiments/${analysis}.md" "$TARGET/docs/experiments/"
+  fi
+done
 
-# Remove dev-only directories that shouldn't be in release
-# (dev/experiments, dev/evaluations, dev/archive are NOT copied — only VISION.md and DECISIONS.md)
+# Final evaluation baselines (latest only)
+mkdir -p "$TARGET/docs/evaluations"
+for pattern in core-014 swe-008; do
+  for f in "$PLUGIN_ROOT"/dev/evaluations/${pattern}-*.json; do
+    [[ -f "$f" ]] && cp "$f" "$TARGET/docs/evaluations/"
+  done
+done
 
 echo ""
 echo "=== Release contents ==="
@@ -79,13 +142,106 @@ echo "  Templates: $(find "$TARGET/templates" -name "*.md" | wc -l | tr -d ' ')"
 echo "  Scripts:  $(find "$TARGET/scripts" -name "*.sh" | wc -l | tr -d ' ')"
 echo ""
 echo "Documentation:"
-echo "  README.md, CLAUDE.md, LICENSE"
-echo "  docs/VISION.md, docs/DECISIONS.md"
-if [[ -d "$TARGET/docs/knowledge" ]]; then
-  echo "  docs/knowledge/: $(find "$TARGET/docs/knowledge" -name "*.md" | wc -l | tr -d ' ') entries"
+echo "  README.md, CLAUDE.md, AGENTS.md, LICENSE"
+echo "  dev/VISION.md, dev/DECISIONS.md, dev/STATUS.md (template), dev/PLAN.md (template)"
+echo "  docs/ROADMAP.md"
+if [[ -d "$TARGET/docs/designs" ]]; then
+  echo "  docs/designs/: $(find "$TARGET/docs/designs" -name "*.md" | wc -l | tr -d ' ') design docs"
+fi
+if [[ -d "$TARGET/docs/experiments" ]]; then
+  echo "  docs/experiments/: $(find "$TARGET/docs/experiments" -name "*.md" | wc -l | tr -d ' ') analysis reports"
+fi
+if [[ -d "$TARGET/docs/evaluations" ]]; then
+  echo "  docs/evaluations/: $(find "$TARGET/docs/evaluations" -name "*.json" | wc -l | tr -d ' ') baselines"
 fi
 echo ""
-echo "Total files: $(find "$TARGET" -type f | wc -l | tr -d ' ')"
+echo "Total files: $(find "$TARGET" -type f -not -path "*/.git/*" | wc -l | tr -d ' ')"
+
+# === Security audit ===
+echo ""
+echo "=== Security audit ==="
+echo ""
+
+AUDIT_FAIL=0
+
+# 1. Actual secret patterns (API keys, tokens)
+SECRET_FILES=$(grep -rl --include="*.md" --include="*.sh" --include="*.json" \
+  -E '(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|AKIA[0-9A-Z]{16}|xox[bpors]-[a-zA-Z0-9-]+)' \
+  "$TARGET" 2>/dev/null || true)
+if [[ -n "$SECRET_FILES" ]]; then
+  echo "FAIL: Actual secret tokens found:"
+  echo "$SECRET_FILES" | sed 's/^/  /'
+  AUDIT_FAIL=1
+else
+  echo "PASS: No actual secret tokens"
+fi
+
+# 2. Credential files (.env, keys, certificates)
+CRED_FILES=$(find "$TARGET" -not -path "*/.git/*" \( -name ".env*" -o -name "credentials*" -o -name "*.pem" -o -name "*.key" \) 2>/dev/null || true)
+if [[ -n "$CRED_FILES" ]]; then
+  echo "FAIL: Credential files found:"
+  echo "$CRED_FILES" | sed 's/^/  /'
+  AUDIT_FAIL=1
+else
+  echo "PASS: No credential files"
+fi
+
+# 3. Hardcoded personal paths in scripts/config
+# Documentation mentions of paths are acceptable; scripts and config are not
+HARDCODED_PATHS=$(grep -rn --include="*.sh" --include="*.json" '/Users/\|/home/' "$TARGET" 2>/dev/null | grep -v '.git/' | grep -v 'prepare-release.sh' || true)
+if [[ -n "$HARDCODED_PATHS" ]]; then
+  echo "WARN: Hardcoded personal paths in scripts/config:"
+  echo "$HARDCODED_PATHS" | sed 's/^/  /'
+else
+  echo "PASS: No hardcoded personal paths in scripts/config"
+fi
+
+# 4. Internal dev file leak check
+# dev/VISION.md, dev/DECISIONS.md, dev/STATUS.md, dev/PLAN.md are intentionally included
+# Check for files that should NOT be in the release
+LEAKED_DEV=$(find "$TARGET/dev" -not -path "*/.git/*" -name "*.md" 2>/dev/null | grep -v -E '(VISION|DECISIONS|STATUS|PLAN)\.md$' || true)
+if [[ -n "$LEAKED_DEV" ]]; then
+  echo "FAIL: Unexpected dev files in release:"
+  echo "$LEAKED_DEV" | sed 's/^/  /'
+  AUDIT_FAIL=1
+else
+  echo "PASS: Only expected dev files present"
+fi
+
+# 5. Required files check
+REQUIRED_FILES=(".claude-plugin/plugin.json" ".claude/settings.json" "CLAUDE.md" "AGENTS.md" "README.md" "CHANGELOG.md" "LICENSE" ".gitignore" "dev/VISION.md" "dev/DECISIONS.md")
+MISSING=""
+for f in "${REQUIRED_FILES[@]}"; do
+  if [[ ! -f "$TARGET/$f" ]]; then
+    MISSING="$MISSING  $f\n"
+  fi
+done
+if [[ -n "$MISSING" ]]; then
+  echo "FAIL: Required files missing:"
+  printf "$MISSING"
+  AUDIT_FAIL=1
+else
+  echo "PASS: All required files present"
+fi
+
+# 6. Hook portability — should use ${CLAUDE_PLUGIN_ROOT}, not absolute paths
+ABS_IN_HOOKS=$(grep -rn --include="*.json" '/Users/\|/home/' "$TARGET/hooks/" 2>/dev/null || true)
+if [[ -n "$ABS_IN_HOOKS" ]]; then
+  echo "FAIL: Absolute paths in hooks (should use \${CLAUDE_PLUGIN_ROOT}):"
+  echo "$ABS_IN_HOOKS" | sed 's/^/  /'
+  AUDIT_FAIL=1
+else
+  echo "PASS: Hooks use portable paths"
+fi
+
+echo ""
+if [[ "$AUDIT_FAIL" -eq 1 ]]; then
+  echo "=== AUDIT FAILED — fix issues before publishing ==="
+  exit 1
+else
+  echo "=== AUDIT PASSED ==="
+fi
+
 echo ""
 echo "=== Next steps ==="
 echo "  cd $TARGET"

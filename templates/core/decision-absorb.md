@@ -51,7 +51,7 @@ ${IF MODE=integrate AND CONFLICTS EXIST:}
 
 ## Knowledge Entry
 
-- **Path**: `docs/knowledge/${FILENAME}.md`
+- **Path**: `docs/specs/knowledge/${FILENAME}.md`
 - **Tags**: ${TAGS}
 - **Related entries**: ${RELATED — entries with overlapping tags, or "None"}
 

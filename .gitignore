@@ -2,6 +2,8 @@
 .worktrees/
 .tmp/
 .trash/
+.captures/
+.compact-context.md
 
 # SWE pipeline artifacts (generated during /swe spiral runs)
 .swe/

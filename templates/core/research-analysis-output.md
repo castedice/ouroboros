@@ -30,7 +30,7 @@
 
 ### Knowledge Base Connections
 
-- {Related entry from docs/knowledge/ with tag overlap, or "No related entries found"}
+- {Related entry from docs/specs/knowledge/ with tag overlap, or "No related entries found"}
 
 ### Suggested Tags
 

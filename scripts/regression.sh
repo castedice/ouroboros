@@ -4,6 +4,7 @@
 # Mechanical operations for evaluation result persistence:
 #   regression.sh enumerate <module>    — list components as JSON array
 #   regression.sh hash <file>           — SHA-256 content hash
+#   regression.sh eval-hash <file> <model[:effort]> [<model[:effort]> ...] — SHA-256 of content+models
 #   regression.sh save <module>         — save stdin JSON to dev/evaluations/, update symlink
 #   regression.sh latest <module>       — print path to latest result file
 #   regression.sh list <module>         — list all evaluation runs for a module
@@ -102,6 +103,36 @@ action_hash() {
 
   local hash
   hash=$(shasum -a 256 "$file" | cut -d' ' -f1)
+  echo "sha256:${hash}"
+}
+
+# ─── Action: eval-hash ───
+#   Args: <file> <model[:effort]> [<model[:effort]> ...]
+#   Output: sha256:{hex} combining content + sorted model specs
+#   Examples:
+#     eval-hash file.md claude-opus-4-6
+#     eval-hash file.md claude-opus-4-6 gpt-5.4:xhigh
+
+action_eval_hash() {
+  local file="${1:?Missing file path}"
+  shift
+
+  if [[ $# -eq 0 ]]; then
+    echo "Error: at least one model spec required (e.g., claude-opus-4-6)" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "$file" ]]; then
+    echo "Error: file not found: $file" >&2
+    exit 2
+  fi
+
+  # Sort model specs alphabetically for deterministic hashing
+  local models
+  models=$(printf '%s\n' "$@" | sort | paste -sd ',' -)
+
+  local hash
+  hash=$(printf '%s\n%s' "$(cat "$file")" "$models" | shasum -a 256 | cut -d' ' -f1)
   echo "sha256:${hash}"
 }
 
@@ -361,12 +392,13 @@ _next_run_number() {
 case "$ACTION" in
   enumerate) action_enumerate "$@" ;;
   hash) action_hash "$@" ;;
+  eval-hash) action_eval_hash "$@" ;;
   save) action_save "$@" ;;
   latest) action_latest "$@" ;;
   list) action_list "$@" ;;
   history) action_history "$@" ;;
   *)
-    echo "Error: unknown action '$ACTION'. Use: enumerate|hash|save|latest|list|history" >&2
+    echo "Error: unknown action '$ACTION'. Use: enumerate|hash|eval-hash|save|latest|list|history" >&2
     exit 1
     ;;
 esac

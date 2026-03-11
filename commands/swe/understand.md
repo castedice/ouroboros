@@ -1,6 +1,6 @@
 ---
 description: "Stage 1 — Analyze requirements, model the problem domain, and survey existing code (DDD)"
-argument-hint: "<task-description> [--depth Skip|Light|Standard|Deep] [--artifact <path>]"
+argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
 
@@ -23,6 +23,7 @@ Extract from $ARGUMENTS:
 | Parameter | Source | Default |
 |-----------|--------|---------|
 | `task` | Positional text (everything not a flag) | Required — abort if empty |
+| `--fast` | Fast mode flag | false |
 | `--depth` | Explicit depth override | None (decided in Phase 2) |
 | `--artifact` | Path to upstream artifact (none for Stage 1) | None |
 
@@ -38,9 +39,15 @@ If `--depth` is provided, validate it is one of: Skip, Light, Standard, Deep. If
 
 ## Phase 2: Depth Decision
 
-If `--depth` was provided, use that value directly. Log: "Depth override: {depth}."
+**Precedence**: `--depth` always overrides `--fast`. When both are present, `--depth` wins.
 
-Otherwise, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md`:
+| Condition | Depth |
+|-----------|-------|
+| `--depth` provided | Use that value directly. Log: "Depth override: {depth}." |
+| `--fast` provided (no `--depth`) | Set depth to Light. Log: "Fast mode: depth set to Light." |
+| Neither | Apply depth decision matrix below |
+
+When neither flag is provided, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md`:
 
 1. Score 5 factors (Task Scope, Risk Level, Domain Familiarity, Team Impact, Reversibility) based on the task description and codebase signals
 2. Sum scores (range 5-15) and map to depth level:
@@ -80,8 +87,8 @@ If no relevant files found: Log "No existing code found related to this task. Pr
 
 Delegate domain analysis to the analyst agent via Task tool:
 
-- **Input**: Task description + gathered context (relevant file contents + file list) + depth level
-- **Instructions**: "Execute Procedure 1 (Understand) at {depth} depth. Follow the template at `templates/swe/context-document.md` — include sections matching the depth markers for this depth level. Use the exact column schemas and section formats defined in the template. Return the artifact content as structured markdown."
+- **Input**: Task description + gathered context (relevant file contents + file list) + depth level + Project Context (if `docs/specs/project/domain.md` exists, include its `## Summary` section)
+- **Instructions**: "Start your output with a `## Summary` section (3-5 sentences capturing the problem, key domain concepts, and affected components), then continue with full content. Execute Procedure 1 (Understand) at {depth} depth. Follow the template at `templates/swe/context-document.md` — include sections matching the depth markers for this depth level. Use the exact column schemas and section formats defined in the template. Return the artifact content as structured markdown."
 - **Expected output**: Context Document content (structured markdown)
 
 ### Recovery
@@ -156,6 +163,9 @@ Run Stage 2 (Constrain) to enumerate design boundaries:
 ### See Also
 - `/swe spec "{task}"` — run all 4 specification stages in sequence
 - `/swe design` — Stage 3 (after Constrain)
+- **Analyst agent** (`agents/swe/analyst.md`) — executes domain analysis
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
+- **Composed by**: `/swe spec` orchestrates this stage with Stages 2-4
 ```
 
 ## Rules

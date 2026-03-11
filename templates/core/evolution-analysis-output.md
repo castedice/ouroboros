@@ -31,7 +31,7 @@
 
 ### Knowledge Base Patterns
 
-- {relevant pattern from docs/knowledge/, with citation}
+- {relevant pattern from docs/specs/knowledge/, with citation}
 - (or "No relevant knowledge entries found")
 
 ### Recommendations

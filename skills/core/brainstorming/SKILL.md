@@ -11,20 +11,32 @@ description: This skill provides brainstorming methodology knowledge. It should 
 
 Brainstorming is a two-phase process. The divergent phase generates raw possibilities without judgment; the convergent phase applies rigorous criteria to select the best. Mixing the phases undermines both — judgment kills creativity during divergence, and uncritical acceptance produces poor decisions during convergence.
 
-The cycle is: **Frame → Diverge → Cluster → Converge → Select**. Each stage has a distinct cognitive mode. The transition between divergence and convergence is the critical moment — it must be explicit and deliberate. A signal like "Divergence complete. Switching to convergence." makes this transition visible and prevents unconscious drift.
+The cycle is: **Frame → Diverge → Cluster → Converge → Select → Reflect (optional)**. Each stage has a distinct cognitive mode. The transition between divergence and convergence is the critical moment — it must be explicit and deliberate. A signal like "Divergence complete. Switching to convergence." makes this transition visible and prevents unconscious drift.
 
 Why two separate phases instead of generate-and-evaluate simultaneously? Because evaluation during generation activates the critic, which suppresses novel ideas. Studies of creative problem-solving consistently show that separated generation and evaluation produce both more ideas and better final selections than simultaneous approaches. The brainstorming methodology encodes this separation structurally, not as a suggestion but as a hard constraint.
 
 ## Brainstorming Workflow
 
-Five stages executed in order. Each stage has a defined input, process, and output. Skipping or reordering stages produces worse results — the ordering is deliberate. For detailed technique descriptions used in Stage 2, see `references/divergent-techniques.md`. For the evaluation framework used in Stage 4, see `references/convergent-criteria.md`.
+Six stages executed in order (the final stage is optional). Each stage has a defined input, process, and output. Skipping or reordering stages produces worse results — the ordering is deliberate.
+
+**Reference files by stage:**
+
+| Stage | Reference | Content |
+|-------|-----------|---------|
+| Frame | `references/framing-techniques.md` | 5 Whys, HMW, Problem Reframing, Stakeholder Mapping, Jobs-to-be-Done |
+| Frame | `references/process-frameworks.md` | Double Diamond, Design Thinking, CPS, TRIZ, Triple Diamond — framework selection guide |
+| Diverge | `references/divergent-techniques.md` | SCAMPER, What-if, Analogy, First Principles, Constraint Removal, Reverse Engineering + TRIZ Principles, Lateral Thinking, Morphological Analysis, Brainwriting 6-3-5, Random Entry |
+| Converge | `references/convergent-criteria.md` | Feasibility × Impact matrix + Novelty Assessment, TRIZ Contradiction Check, Weighted Decision Matrix, Time-to-Value, Pareto Priority |
+| Reflect | `references/meta-reflection.md` | Double Loop Learning, Assumption Mapping, Reflection Trigger |
 
 ### 1. Frame (Scope)
 
 **Input**: Raw topic or question from the user.
-**Output**: Scoped brainstorming question with identified constraints.
+**Output**: Scoped brainstorming question with identified constraints and selected process framework.
 
 - Clarify what to explore: a question, a problem, or an open-ended topic
+- Apply framing techniques from `references/framing-techniques.md` to deepen problem understanding (5 Whys for root cause, HMW for reframing, Jobs-to-be-Done for user purpose)
+- Select a process framework from `references/process-frameworks.md` to structure the session (or use the default 6-stage flow if no framework fits better)
 - Identify constraints: technical, resource, timeline, architectural
 - Gather context: existing decisions, related code, knowledge base entries
 - Define success: what makes a good outcome for this brainstorm session
@@ -106,33 +118,34 @@ Selection is a recommendation, not a decision. The user makes the final choice. 
 
 **Next action format**: Each suggestion must be a specific command invocation with arguments, not a generic reference. `/research "caching patterns in CLI tools"` is specific; `/research topic` is generic.
 
-## Technique Overview
+### 6. Reflect (Optional)
 
-Six structured techniques are available for the divergent phase, each suited to different types of topics. See `references/divergent-techniques.md` for detailed procedure cards.
+**Input**: Top 3 recommendations from the Select stage.
+**Output**: Reflection notes identifying blind spots, challenged assumptions, or process improvements.
 
-| Technique | Best For | Produces |
-|-----------|----------|----------|
-| SCAMPER | Improving existing things | Systematic variations of current state |
-| What-if | Breaking assumptions | Possibility expansion beyond current constraints |
-| Analogy | Cross-domain inspiration | Patterns borrowed from other domains |
-| First Principles | Fundamental rethinking | Ground-up reconstruction from core truths |
-| Constraint Removal | Expanding possibility space | Ideas freed from dominant constraints |
-| Reverse Engineering | Working backward from ideal | Critical path from desired outcome to current state |
+- Apply meta-reflection techniques from `references/meta-reflection.md`
+- **Double Loop Learning**: Ask "Did we solve the right problem?" — check if the framing was appropriate
+- **Assumption Mapping**: Identify hidden assumptions in the top recommendations that were never explicitly challenged
+- **Reflection Trigger**: Check "What perspectives or stakeholders did we miss?"
 
-**Technique rotation**: If one technique dominates (produced 60%+ of ideas), force a round with a different technique. Diversity of techniques produces diversity of ideas. Mono-technique brainstorming is a common failure mode that produces variations-on-a-theme rather than genuinely different approaches.
+This stage is optional but recommended for high-stakes topics (strategic decisions, architecture changes, roadmap planning). Skip for narrow tactical brainstorms where the framing is clearly correct.
 
-## Convergent Framework Overview
+**Trigger conditions** — apply Reflect when any of these are true:
 
-The convergent analysis framework uses a Feasibility × Impact matrix as the primary evaluation tool, with Risk and Alignment as secondary filters. See `references/convergent-criteria.md` for the detailed framework.
+| Condition | Why Reflect |
+|-----------|-------------|
+| Top 3 ideas are all from the same cluster | Possible tunnel vision — reflection may reveal missed directions |
+| The framing was inherited, not actively chosen | The problem definition may not be the right one |
+| Stakeholders beyond the immediate user are affected | Perspectives may have been missed |
+| The topic involves irreversible decisions | Higher stakes warrant the extra scrutiny |
 
-**Feasibility × Impact matrix** (the primary tool):
+## Quick Reference
 
-|  | **High Feasibility** | **Low Feasibility** |
-|---|---|---|
-| **High Impact** | **Do First** — clear wins | **Invest** — high reward justifies effort |
-| **Low Impact** | **Quick Wins** — easy but marginal | **Avoid** — high cost, low reward |
+**Techniques**: 11 divergent techniques available — see `references/divergent-techniques.md` for procedure cards. Core 6: SCAMPER, What-if, Analogy, First Principles, Constraint Removal, Reverse Engineering. Extended 5: TRIZ Principles, Lateral Thinking, Morphological Analysis, Brainwriting 6-3-5, Random Entry. If one technique dominates (60%+ of ideas), force rotation.
 
-**Tiebreaker order** when ideas are close in ranking: Reversibility → Compound potential → Simplicity → User energy.
+**Frameworks**: 5 process frameworks available — see `references/process-frameworks.md` for stage mappings. Use the default 6-stage flow for most topics; override with Double Diamond (unclear problem), Design Thinking (user-centered), CPS (structured problem), TRIZ (technical contradiction), or Triple Diamond (complex system). Framework overhead should not exceed framework benefit. If the framework feels constraining midway, switch to default.
+
+**Convergence**: Feasibility × Impact matrix (primary) with Risk and Alignment (secondary) — see `references/convergent-criteria.md`. Tiebreaker: Reversibility → Compound potential → Simplicity → User energy.
 
 ## Bias Mitigation
 
@@ -145,6 +158,7 @@ Brainstorming involves both generation and evaluation, creating systematic bias 
 | Status quo | Converge | Favoring ideas closest to current implementation | Explicitly score novelty as a positive factor in impact assessment |
 | Confirmation | Converge | Seeking evidence that supports preferred idea | Require at least one weakness for every top-3 idea |
 | Sunk cost | Converge | Favoring ideas that build on existing investment | Evaluate each idea as if starting from scratch; past investment is not a criterion |
+| Framework fixation | Frame | Forcing the topic into a chosen framework even when it doesn't fit | If the framework feels constraining midway, switch to the default 6-stage flow |
 
 **Detection checklist** — before finalizing any brainstorm output:
 
@@ -153,6 +167,7 @@ Brainstorming involves both generation and evaluation, creating systematic bias 
 - [ ] Are the top 3 all similar to current state? (status quo bias)
 - [ ] Does every top-3 idea have a genuine weakness? (confirmation bias)
 - [ ] Was existing investment used as justification? (sunk cost)
+- [ ] Did the chosen framework constrain thinking rather than enable it? (framework fixation)
 
 ## Common Pitfalls
 
@@ -183,6 +198,8 @@ Use this checklist to verify that brainstorming methodology is being applied cor
 - [ ] Top 3 ideas include rationale and at least one genuine weakness each
 - [ ] Runner-up reasoning explains why #2 and #3 are worth considering
 - [ ] Next actions are specific command invocations with arguments
+- [ ] If a process framework was used, its stages were mapped to the 6-stage flow
+- [ ] If Reflect stage was triggered, assumptions and blind spots were explicitly noted
 
 ## See Also
 

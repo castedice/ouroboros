@@ -1,0 +1,18 @@
+{
+  "rust": {
+    "command": "rust-analyzer",
+    "extensionToLanguage": {
+      ".rs": "rust"
+    },
+    "initializationOptions": {
+      "check": {
+        "command": "clippy"
+      },
+      "cargo": {
+        "buildScripts": {
+          "enable": true
+        }
+      }
+    }
+  }
+}

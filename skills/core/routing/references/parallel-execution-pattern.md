@@ -48,7 +48,7 @@ Construct the relay prompt from Phase 2 data. Save to `.tmp/{SESSION_ID}_relay.t
 **Background branch** — external model via Bash with `run_in_background: true`:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
+${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
 ```
 
 The background task ID is stored for later collection.
@@ -87,9 +87,29 @@ The bottleneck becomes whichever evaluation takes longer. Since Claude and Codex
 
 Standard fan-out/fan-in — one background + one foreground.
 
-### Mode B: Module Scan
+### Mode B: Module Scan — Batch Parallel
 
-Per-component fan-out: for each component, launch background + foreground in parallel. Components themselves are processed sequentially (to maintain reasoning quality and circuit breaker state).
+Components are grouped into batches of 3 and evaluated concurrently. Each batch launches up to 3 Claude Tasks simultaneously + 3 Codex Bash backgrounds (if `--multi`), totaling up to 6 concurrent evaluations per batch.
+
+```text
+Batch 1: [c1, c2, c3]
+  ├── Claude: Task(c1) + Task(c2) + Task(c3)  [3 foreground, launched together]
+  ├── Codex:  Bash(c1) + Bash(c2) + Bash(c3)  [3 background, if --multi]
+  └── Fan-in → Circuit breaker check → Next batch
+
+Batch 2: [c4, c5, c6]
+  └── Same pattern, skip tripped models
+```
+
+**Why batch size 3**: 3 Claude Tasks + 3 Codex Bash = 6 concurrent agents. Conservative enough to avoid platform limits while providing ~3× speedup over sequential processing.
+
+**Temp file naming**: `.tmp/{SESSION_ID}_{idx}_relay.txt` and `.tmp/{SESSION_ID}_{idx}_codex_eval.json` where `idx` is the component's position in the Phase 2 discovery order (0-indexed).
+
+**Circuit breaker**: checked at batch boundaries. In-flight tasks within a batch always complete; tripped models are skipped in subsequent batches.
+
+**Opt-out**: `--sequential` flag restores one-at-a-time processing.
+
+**Result ordering**: batch completion order does not affect report structure. Results are always presented in Phase 2 discovery order.
 
 ### Mode C: Before/After
 
@@ -113,6 +133,52 @@ This pattern applies wherever Claude agent + external model perform independent 
 | `/upgrade` | Phase 4 (Classification) | reconciler agent | Codex reconciler (cherry-pick) |
 | `/upgrade` | Phase 5 (Merge) | reconciler agent | Codex reconciler (cherry-pick) |
 | `/upgrade` | Phase 7 (Validate) | evaluator before/after | Codex evaluator before/after |
+
+## Resilient Collection — 3-Tier Safety Net
+
+Use `scripts/parallel.sh` for structured result collection with gap detection and recovery.
+
+### Tier 1: Init — Manifest Creation
+
+Before fan-out, create a manifest declaring all expected results:
+
+```bash
+bash scripts/parallel.sh init "$SESSION_ID" '[{"idx":0,"model":"codex","file":".tmp/{SESSION}_0_codex.json"}]'
+```
+
+The manifest at `.tmp/{SESSION}_manifest.json` tracks `session_id`, `expected` entries, and `started_at` timestamp.
+
+### Tier 2: Collect — Gap Detection
+
+After fan-in, verify all expected results arrived:
+
+```bash
+bash scripts/parallel.sh collect "$SESSION_ID"
+```
+
+- Exit 0: all results present → proceed to consensus
+- Exit 1: gaps detected → stdout reports MISSING/EMPTY entries with idx and model
+
+When gaps are detected, the command can skip missing models (standard fallback) or attempt Tier 3 recovery.
+
+### Tier 3: Recover — JSONL Fallback
+
+For orphaned results (background task completed but file not written properly):
+
+```bash
+bash scripts/parallel.sh recover "$SESSION_ID" "$TRANSCRIPT_PATH"
+```
+
+Attempts to extract results from `.raw` files or the JSONL transcript. This is a last resort — most failures are handled by Tier 2 gap reporting and the existing circuit breaker.
+
+### Integration Points
+
+| Command | Where | Usage |
+|---------|-------|-------|
+| `/evaluate` Phase 3 | Before fan-out | `parallel.sh init` to declare expected entries |
+| `/evaluate` Phase 3 Step 3 | After fan-in | `parallel.sh collect` to verify results |
+| `/evolve` Phase 6 | Validate fan-in | Same init/collect pattern |
+| Mode B batches | Per batch | Init per batch, collect per batch |
 
 ## Constraints
 

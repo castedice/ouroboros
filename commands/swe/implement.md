@@ -1,6 +1,6 @@
 ---
 description: "Stage 6 — Write minimal code to pass all tests using TDD Green Phase (TDD)"
-argument-hint: "<task-description> [--depth Skip|Light|Standard|Deep] [--artifact <test-suite-path>]"
+argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <test-suite-path>]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Task, Bash
 ---
 
@@ -79,13 +79,13 @@ Collect all upstream artifacts and baseline state:
    - If `--artifact` is not provided: use `.swe/active/05-test.md` as the Test Suite artifact. If not found:
      - Output: "Error: Test Suite artifact required. Run `/swe test` first or provide `--artifact <path>`."
      - Abort
-2. **Interface Contracts**: Read `.swe/active/04-interface.md`
+2. **Interface Contracts**: Read `.swe/active/04-interface.md` in full (required)
    - Extract public interfaces, type definitions, error conditions — these are the contracts the implementation must fulfill
    - If not found: warn "No Interface Contracts found. Implementation will be guided by test assertions only."
-3. **Architecture Spec**: Read `.swe/active/03-design.md` for structural decisions
+3. **Architecture Spec**: Read `.swe/active/03-design.md`. At Light depth, read summary only (`Read(file, limit: 15)`) per the Selective Load Matrix in `artifact-contracts.md`. At Standard+ depth, read in full
    - Extract module placement, naming conventions, data model, selected patterns
    - If not found: warn "No Architecture Spec found. Implementation structure will follow existing codebase conventions."
-4. **Constraint Profile**: Read `.swe/active/02-constrain.md` for performance requirements
+4. **Constraint Profile**: At Light depth, read summary only from `.swe/active/02-constrain.md`. At Standard+ depth, read in full
    - Extract Hard performance constraints (required for Deep depth implementation)
    - If not found at Deep depth: warn "No Constraint Profile found for Deep implementation. Performance targets unavailable."
 5. **Existing source code**: Survey codebase for files related to the task
@@ -130,63 +130,8 @@ Source code has been written by the implementer agent during Phase 4. Now confir
    - All tests pass → Green state confirmed
    - Some tests pass → Partial implementation (log progress)
    - Build failure → Report error (should have been caught in Phase 4 recovery)
-3. **Write implementation artifact** to `.swe/active/06-implement.md`:
-
-```markdown
-# Implementation: {task summary}
-
-**Stage**: 6 — Implement (TDD Green Phase)
-**Depth**: {depth}
-**Task**: {task description}
-**Upstream**: {test suite artifact path}
-**Date**: {date}
-
----
-
-## Green State
-
-**Status**: {Confirmed | Partial ({n}/{total} passing)}
-**Test Runner**: {command used}
-
-### Test Output
-
-{full test runner output}
-
-## Implementation Summary
-
-{brief description of key implementation decisions — what patterns were used, why}
-
-## Files Modified
-
-| File | Action | Description |
-|------|--------|-------------|
-| {path} | Created | {what was implemented} |
-| {path} | Modified | {what was changed and why} |
-
-## Constraint Traceability
-
-| Implementation Decision | Driving Constraint/Contract |
-|------------------------|---------------------------|
-| {decision} | {constraint or interface contract reference} |
-
-## Contract Delta Notes
-
-{any gaps discovered in upstream artifacts during implementation — or "None"}
-
----
-
-**Exit Criteria Check**:
-- [ ] All tests pass (Green state)
-- [ ] Implementation follows Architecture Spec structure
-- [ ] Result pattern used for error handling
-- [ ] No untested code paths introduced
-- [ ] {At Standard+} Inline documentation complete (docstrings, type annotations)
-- [ ] {At Standard+} Each implementation decision traces to a contract or constraint
-- [ ] {At Deep} Structured logging and observability in place
-- [ ] {At Deep} Performance-aware implementation aligned to Constraint Profile SLAs
-```
-
-4. Write to output path via Write tool
+3. Wrap agent output using the Stage 6 (Implement) artifact wrapper from `skills/swe/methodology/references/artifact-wrappers.md`. Bind: task_summary={task summary}, depth={depth}, task_description={task description}, upstream_path={upstream artifact path}, date={date}.
+4. Write to output path (`.swe/active/06-implement.md`) via Write tool
 
 Present to user:
 
@@ -231,6 +176,8 @@ Run Stage 7 (Verify) to validate against acceptance criteria and spec compliance
 - `/swe dev "{task}"` — run all 4 development stages in sequence
 - `/swe optimize "{task}"` — Stage 8 (after Verify)
 - `/swe test "{task}"` — revisit Stage 5 if implementation reveals test gaps
+- **Implementer agent** (`agents/swe/implementer.md`) — executes TDD Green Phase
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
 ```
 
 ## Rules

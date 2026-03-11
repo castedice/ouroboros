@@ -2,6 +2,14 @@
 # Layer 2: WebFetch URL validation hook
 # Blocks dangerous URLs: non-HTTPS protocols, internal IPs, direct IP access
 # Part of ouroboros 4-layer security design
+#
+# Coverage boundary — NOT protected against:
+#   - DNS rebinding (domain resolves to internal IP after validation)
+#   - HTTP redirect chains to internal addresses (post-fetch)
+#   - IPv6 beyond link-local (fe80:) — e.g., unique local (fd00::/8)
+#   - URL encoding/obfuscation bypasses (e.g., %31%32%37.0.0.1)
+#   - TOCTOU between this check and actual fetch
+# These require runtime/network-level mitigations outside hook scope.
 
 INPUT=$(cat)
 URL=$(echo "$INPUT" | jq -r '.tool_input.url // empty')

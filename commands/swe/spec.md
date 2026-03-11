@@ -1,6 +1,6 @@
 ---
 description: "Specification composite — orchestrate Stages 1-4 (Understand, Constrain, Design, Interface) to produce a complete specification"
-argument-hint: "<task-description> [--depth <global|per-stage>]"
+argument-hint: "<task-description> [--fast] [--depth <global|per-stage>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
 
@@ -26,7 +26,10 @@ Extract from $ARGUMENTS:
 | Parameter | Source | Default |
 |-----------|--------|---------|
 | `task` | Positional text | Required — abort if empty |
+| `--fast` | Shortcut for `--depth Light` with relaxed skip conditions | Off |
 | `--depth` | Depth specification | Standard (global) |
+
+**`--fast` mode**: Sets all stages to Light depth and enables relaxed skip conditions in each primitive stage. If both `--fast` and `--depth` are present, `--depth` takes precedence.
 
 `--depth` accepts two formats:
 
@@ -50,11 +53,12 @@ If `task` is empty:
 ## Phase 2: Depth Planning
 
 1. If `--depth` was provided, use parsed values
-2. If no `--depth`, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md` independently for each stage:
+2. If `--fast` was provided (and no `--depth`), set all stages to Light and enable `fast_mode=true` — skip depth matrix scoring entirely
+3. If neither, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md` independently for each stage:
    - Score 5 factors once (they apply to the task overall)
    - Apply stage-specific minimum depth triggers for each stage
    - Apply escalation rules
-3. Build Depth Plan:
+4. Build Depth Plan:
 
 ```text
 Depth Plan: U:{level} C:{level} D:{level} I:{level}
@@ -83,8 +87,8 @@ Execute the Understand stage by delegating to the analyst agent:
 
 > Agent: **analyst**
 
-- **Input**: Task description + depth level for Understand
-- **Instructions**: Same as `commands/swe/understand.md` Phase 4 analyst instructions, at the planned depth
+- **Input**: Task description + depth level for Understand + Project Context (if `docs/specs/project/domain.md` exists, include its `## Summary` section)
+- **Instructions**: Follow the Stage 1 (Understand) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Context Document content
 
 1. Survey codebase for task-relevant context (same as understand.md Phase 3)
@@ -103,8 +107,8 @@ Execute the Constrain stage, passing the Context Document forward:
 
 > Agent: **analyst**
 
-- **Input**: Task description + Context Document content + depth level for Constrain
-- **Instructions**: Same as `commands/swe/constrain.md` Phase 4 analyst instructions, at the planned depth. Reference the Context Document for domain context
+- **Input**: Task description + Context Document content + depth level for Constrain + Project Context (if `docs/specs/project/constraints.md` exists, include its `## Summary` section)
+- **Instructions**: Follow the Stage 2 (Constrain) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Constraint Profile content
 
 1. Delegate to analyst with Context Document as input context
@@ -124,8 +128,8 @@ Execute the Design stage, passing the Constraint Profile forward:
 
 > Agent: **analyst**
 
-- **Input**: Task description + Context Document content + Constraint Profile content + depth level for Design
-- **Instructions**: Same as `commands/swe/design.md` Phase 4 analyst instructions, at the planned depth. Use Constraint Profile as design boundary. Reference Context Document for domain model
+- **Input**: Task description + Context Document content + Constraint Profile content + depth level for Design + Project Context (if `docs/specs/project/architecture.md` exists, include its `## Summary` section)
+- **Instructions**: Follow the Stage 3 (Design) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Architecture Spec content
 
 1. Survey existing architecture patterns (same as design.md Phase 3)
@@ -144,8 +148,8 @@ Execute the Interface stage, passing the Architecture Spec forward:
 
 > Agent: **analyst**
 
-- **Input**: Task description + Architecture Spec content + Constraint Profile content (for performance SLAs) + depth level for Interface
-- **Instructions**: Same as `commands/swe/interface.md` Phase 4 analyst instructions, at the planned depth. Extract component boundaries from Architecture Spec. Reference Constraint Profile for performance contracts
+- **Input**: Task description + Architecture Spec content + Constraint Profile content (for performance SLAs) + depth level for Interface + Project Context (if `docs/specs/project/interfaces.md` exists, include its `## Summary` section)
+- **Instructions**: Follow the Stage 4 (Interface) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Interface Contracts content
 
 1. Survey existing interfaces (same as interface.md Phase 3)
@@ -209,6 +213,11 @@ Run development stages (Test, Implement, Verify, Optimize):
 ### See Also
 - `/swe spiral "{task}"` — full engineering cycle (spec + dev + ship + tune)
 ```
+
+### See Also
+- **Analyst agent** (`agents/swe/analyst.md`) — executes specification analysis
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
+- **Artifact Contracts** (`skills/swe/methodology/references/artifact-contracts.md`) — stage input/output specifications
 
 ## Rules
 

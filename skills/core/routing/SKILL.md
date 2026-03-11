@@ -1,6 +1,6 @@
 ---
 name: routing-methodology
-description: This skill provides multi-model routing methodology. It should be activated when a command needs to "route a task to an external model", "invoke Gemini or Codex CLI", "select the right model for a task", "integrate results from multiple models", "build a consensus from multi-model outputs", or "handle external model failure gracefully".
+description: This skill provides multi-model routing methodology. It should be activated when a command needs to "route a task to an external model", "invoke Codex CLI", "select the right model for a task", "integrate results from multiple models", "build a consensus from multi-model outputs", or "handle external model failure gracefully".
 ---
 
 # Routing Methodology
@@ -9,7 +9,7 @@ description: This skill provides multi-model routing methodology. It should be a
 
 **"The right model for the right task."**
 
-No single model excels at everything. Claude has deep reasoning and instruction following, Codex brings strong code expertise and fast execution, Gemini offers breadth with a massive context window. Routing selects the optimal model (or combination) for each task, while the host model (Claude) always orchestrates. Priority order: **Claude > Codex > Gemini**.
+No single model excels at everything. Claude has deep reasoning and instruction following, Codex brings strong code expertise and fast execution. Routing selects the optimal model (or combination) for each task, while the host model (Claude) always orchestrates. Priority order: **Claude > Codex**.
 
 This principle drives every design choice: task classification determines model selection, independent scoring prevents anchoring bias, and graceful degradation ensures no external dependency blocks the workflow.
 
@@ -25,7 +25,7 @@ Determine the task category and stake level:
 |----------|----------|-------------|
 | Evaluation | Static scoring, output assessment | Consensus (independent) |
 | Comparison | Before/after, pairwise judgment | Consensus (independent) |
-| Decision | Architecture choice, trade-off analysis | Full triangle (3-way) |
+| Decision | Architecture choice, trade-off analysis | 2-way debate (Claude + Codex) |
 | Extraction | Pattern analysis, bulk scanning | Cherry-pick or single-model |
 | Review | Code review, security audit | Adversarial (external as devil's advocate) |
 | Generation | Component creation, template filling | Single-model (host) |
@@ -38,12 +38,19 @@ Stake level determines how many models to involve:
 |-------|----------|--------|
 | Low | Reversible, exploratory, routine | 1 (host only, or single external) |
 | Medium | Stored/recorded, influences future work | 2 (host + 1 external) |
-| High | Architectural, irreversible, user-facing decision | 3 (full triangle) |
+| High | Architectural, irreversible, user-facing decision | 2 (Claude + Codex, high reasoning) |
 
 ### Step 3: Lookup Routing Table
 
-Consult `references/routing-table.md` for the task category x stake level mapping.
-The table specifies which model(s) to invoke and which integration mode to use.
+Consult `references/routing-table.md` for the task category x stake level mapping. Key defaults:
+
+| Task | Primary External | Reasoning Effort | Notes |
+|------|-----------------|-----------------|-------|
+| Evaluation (static) | Codex gpt-5.4 | xhigh | Independent scoring, strict on borderline |
+| Code review | Codex gpt-5.4 | high | Coding model strength |
+| Brainstorm | Codex gpt-5.2 | high | Non-coding: general-purpose model |
+
+Priority order: Claude > Codex. Codex coding models (`-codex`) for code tasks, `gpt-5.2` for non-code tasks.
 
 ### Step 4: Construct Prompt Relay
 
@@ -69,7 +76,7 @@ Apply the appropriate integration mode from `references/consensus-protocol.md`:
 Multi-model invocation happens exclusively at the **command level** via Bash tool. Background Task agents cannot access Bash or network — this is a fundamental Claude Code constraint. Commands orchestrate external calls; agents remain read-only and single-model.
 
 ```text
-Command (orchestration) ──Bash──> External CLI (Gemini/Codex)
+Command (orchestration) ──Bash──> External CLI (Codex)
          │
          └──Task──> Agent (read-only, single-model)
 ```
@@ -113,8 +120,7 @@ Multi-model invocation multiplies token costs:
 |------|----------------------|
 | Single (default) | 1x |
 | Host + 1 external | ~1.5x |
-| Full triangle (3 models) | ~2.5x |
-| Module scan × multi | ~2.5 × N components |
+| Module scan × multi | ~1.5 × N components |
 
 Cost controls:
 
@@ -133,6 +139,18 @@ Cost controls:
 | Treating `--multi` as always better | Single-model is fine for most tasks; multi adds value for evaluation and high-stake decisions |
 | Ignoring parse failures | 3-tier fallback: script parse → script fallback → LLM reads raw file |
 | Assuming all CLIs are installed | Check availability first (`which`); degrade gracefully |
+
+## Consumers
+
+Commands and agents that integrate this skill:
+
+| Consumer | Usage | Flag |
+|----------|-------|------|
+| `commands/core/evaluate.md` | Multi-model evaluation (Phase 3 parallel fan-out/fan-in) | `--multi` |
+| `commands/core/evolve.md` | Multi-model researcher analysis (Phase 3) + validation (Phase 6) | `--multi` |
+| `commands/core/brainstorm.md` | 2-way brainstorm (Claude + Codex) | `--multi` |
+
+Agents do not use this skill directly — multi-model routing is command-level only (see Architecture Constraints).
 
 ## Validation Checklist
 

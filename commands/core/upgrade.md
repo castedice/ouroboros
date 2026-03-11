@@ -1,6 +1,6 @@
 ---
 description: Upgrade ouroboros from upstream — fetch changes, reconcile with local customizations, validate, and apply
-argument-hint: [--check] [--source <path>] [--multi]
+argument-hint: [--check] [--source <path>] [--single]
 allowed-tools: Read, Glob, Grep, Bash, Write, Edit, Task
 ---
 
@@ -26,7 +26,7 @@ Extract options from $ARGUMENTS:
 |--------|----------|-------------|
 | `--check` | No | Dry-run mode — classify and analyze but do not apply changes. Exits after Phase 5 |
 | `--source <path>` | No | Local upstream path instead of git remote. Must be a valid directory containing ouroboros structure |
-| `--multi` | No | Enable multi-model reconciliation in Phase 4-5 (Claude + Codex parallel reconciler, cherry-pick merge) and Phase 7 (Claude + Codex parallel evaluator, consensus) |
+| `--single` | No | Force single-model mode (skip external CLIs). By default, multi-model is auto-detected — if codex CLI is installed, Codex runs in parallel for reconciliation (Phase 4-5) and evaluation (Phase 7) |
 
 If both `--check` and `--source` are provided, both apply (dry-run against local source).
 
@@ -41,41 +41,40 @@ If `--source <path>` provided:
 3. If invalid → Error: "Error: '{path}' is not a valid ouroboros directory. Expected `.claude-plugin/plugin.json` or `commands/core/`."
 4. Abort
 
+## Branch Summary
+
+All conditional branches that affect command behavior, consolidated for quick reference.
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| Source | Git remote (default) | 2: Git mode | Fetch from configured remote |
+| Source | `--source <path>` | 2: Local mode | Compare against local directory |
+| `--check` | true | 6–10 skipped | Dry-run: classify and analyze only, exit after Phase 5 |
+| `--check` | false (default) | All phases run | Full upgrade with worktree and merge |
+| `--single` | true | 4, 5, 7 | Claude only for reconciliation and validation |
+| `--single` | false (default) | 4, 5, 7 | Auto-detect: if codex CLI installed, parallel processing |
+| Upstream version | Same as current | 2: early exit | "Already up to date." → Exit |
+| Classification | No conflicts | 4, 5, 7 skipped | Fast path: skip reconciler and evaluator, proceed to Phase 6 |
+| `--source <path>` | Invalid directory | 1 abort | Error: not a valid ouroboros directory |
+| Git remote | Not configured | 2 abort | Error + suggest `--source <path>` alternative |
+| CONFLICT-B files | Present | 5 | User selects per file: keep local / adopt upstream / merge both |
+| REMOVAL-GUARDED | Present | 5 | User chooses keep or remove per file |
+| Existing worktree | Found | 6a: Session Recovery | User chooses Resume / Discard / Merge |
+| Validation verdict | `degraded` | 7, 9 | Flag for user review with details |
+
 ## Phase 2: Fetch Upstream
 
 ### Git Remote Mode (default)
 
 1. Check if a git remote exists:
 
-   ```bash
-   git remote -v
-   ```
+   Verify a git remote is configured. If not → Error: "No git remote configured. Use `--source <path>` or add a remote."
 
-   - If no remote configured → Error: "No git remote configured. Use `--source <path>` to upgrade from a local directory, or add a remote with `git remote add origin <url>`."
-   - Abort
+2. Fetch latest from remote and compare HEAD vs origin/main.
+   - If same → Log: "Already up to date." → Exit
+   - If different → Log: "Upstream has new changes."
 
-2. Fetch latest from remote:
-
-   ```bash
-   git fetch origin
-   ```
-
-3. Compare versions:
-   - Current: `git rev-parse HEAD`
-   - Upstream: `git rev-parse origin/main`
-   - If same → Log: "Already up to date (${VERSION})." → Exit
-   - If different → Log: "Upstream has new changes. Current: ${CURRENT_SHORT}, Upstream: ${UPSTREAM_SHORT}."
-
-4. Generate diff manifest:
-
-   ```bash
-   git diff --name-status HEAD...origin/main
-   ```
-
-   Parse into a structured manifest:
-   - `A` → Added files
-   - `M` → Modified files
-   - `D` → Deleted files
+3. Generate diff manifest via `git diff --name-status HEAD...origin/main`. Classify files as Added (A), Modified (M), or Deleted (D).
 
 ### Local Source Mode (`--source <path>`)
 
@@ -153,40 +152,7 @@ Reconciliation analysis runs Claude reconciler for deep intent-aware classificat
 
 ### When `--multi` is active (parallel):
 
-1. **Build reconciler relay prompt**: Construct from diff manifest + customization map + decision entries + classification instructions. Save to `.tmp/{SESSION_ID}_reconciler_relay.txt`
-
-   **Section 1 — Role** (fixed template):
-
-   ```text
-   You are an independent version reconciliation analyst. Your task is to analyze upstream changes against local customizations and classify each change with a resolution strategy. Do not assume any prior context — analyze based solely on the diff manifest, decision entries, and customization map given.
-   ```
-
-   **Section 2 — Content**: Diff manifest with classifications + customization map + decision entry contents (verbatim).
-
-   **Section 3 — Methodology**:
-
-   ```text
-   Follow this procedure:
-   1. Parse the diff manifest and customization map
-   2. For each file, validate the classification (AUTO-MERGE / CONFLICT-A / CONFLICT-B / ADDITION / REMOVAL / REMOVAL-GUARDED)
-   3. For CONFLICT-A: determine if section-level auto-merge is possible or full 3-way analysis is needed
-   4. For CONFLICT-B: identify overlapping capabilities and recommend options
-   5. Produce resolution strategy for each conflict
-   ```
-
-   **Section 4 — Response Format**: JSON with `classifications`, `conflict_strategies`, `section_merges`, `full_merges` arrays.
-
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_reconciler_relay.txt .tmp/{SESSION_ID}_codex_recon.json high, run_in_background=true)`
-   - **Foreground**: Launch Claude **reconciler** agent (via Task tool) with Procedure 1 inputs
-
-3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-
-4. **Cherry-pick merge**: Review both reconciliation reports and build unified classification:
-   - Use Claude's classifications as primary (Claude has full decision entry context)
-   - Cherry-pick from Codex: additional conflict signals, alternative resolution strategies, missed overlaps
-   - If Codex identifies a conflict that Claude classified as AUTO-MERGE, escalate to CONFLICT-A (conservative)
-   - If Codex analysis failed or is partial, proceed with Claude-only analysis
+Run Codex reconciler in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: Phase 4 Reconciliation Analyst template from `skills/core/routing/references/relay-prompt-templates.md`. Merge strategy: cherry-pick (Claude primary, Codex supplements with additional conflict signals; Codex conflict escalates Claude's AUTO-MERGE to CONFLICT-A). Codex failure → Claude-only.
 
 ### When `--multi` is not active (single-model):
 
@@ -216,55 +182,11 @@ For each conflict requiring detailed analysis. When `--multi` is active, Claude 
 
 For each CONFLICT-A file needing full 3-way merge:
 
-1. **Build merge relay prompt**: Construct from base + upstream + local versions + decision entries + merge instructions. Save to `.tmp/{SESSION_ID}_merge_relay.txt`
-
-   **Section 1 — Role** (fixed template):
-
-   ```text
-   You are an independent version reconciliation specialist. Your task is to perform a 3-way merge of a plugin component, preserving user customization intent as recorded in decision entries. Do not assume any prior context — analyze based solely on the versions and decision entries given.
-   ```
-
-   **Section 2 — Content**: Base version + upstream version + local version + related decision entries (all verbatim).
-
-   **Section 3 — Methodology**:
-
-   ```text
-   Follow this procedure:
-   1. Identify user intent from decision entries (what was changed and why)
-   2. Analyze each section: classify as unchanged / upstream-only / local-only / both-modified
-   3. For both-modified sections: merge preserving user intent while incorporating upstream improvements
-   4. Produce complete merged file content with origin annotations
-   ```
-
-   **Section 4 — Response Format**: JSON with `file_path`, `section_analysis`, `merged_content`, `intent_preservation`, `regressions`, `recommendations`.
-
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_merge_relay.txt .tmp/{SESSION_ID}_codex_merge.json high, run_in_background=true)`
-   - **Foreground**: Launch Claude **reconciler** agent (via Task tool) with Procedure 2 inputs
-
-3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-
-4. **Cherry-pick merge**: Review both merge outputs:
-   - Use Claude's merged content as primary (Claude has full context including knowledge base)
-   - Cherry-pick from Codex: better section ordering, clearer intent annotations, additional regression detection
-   - If Codex detected regressions that Claude missed, incorporate them
-   - If Codex merge failed, proceed with Claude-only merge
-
-Process CONFLICT-A files sequentially (each merge depends on its specific inputs). Circuit breaker: 2 consecutive Codex failures → skip Codex for remaining files.
+For each CONFLICT-A file, run Codex reconciler in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: Phase 5 Merge Specialist template from `relay-prompt-templates.md`. Merge strategy: cherry-pick (Claude primary, incorporate Codex regression detection). Process sequentially (each merge depends on its inputs). Circuit breaker: 2 consecutive Codex failures → skip Codex for remaining.
 
 #### CONFLICT-B Files
 
-For each CONFLICT-B file:
-
-1. **Build overlap relay prompt**: Construct from upstream + local files + decision entry + comparison instructions. Save to `.tmp/{SESSION_ID}_overlap_relay.txt`
-
-   Use same 4-section structure with CONFLICT-B-specific methodology (side-by-side comparison, 3 options, pros/cons).
-
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_overlap_relay.txt .tmp/{SESSION_ID}_codex_overlap.json high, run_in_background=true)`
-   - **Foreground**: Launch Claude **reconciler** agent (via Task tool) for CONFLICT-B analysis
-
-3. **Fan-in + Cherry-pick**: Same pattern — Claude primary, cherry-pick Codex's unique trade-off insights.
+For each CONFLICT-B file, run Codex in parallel per the same pattern. Relay prompt: Phase 5 Overlap Analyst template. Cherry-pick Codex's unique trade-off insights.
 
 ### When `--multi` is not active (single-model):
 
@@ -396,17 +318,7 @@ Validate merged CONFLICT-A files to ensure quality was preserved. When `--multi`
 
 ### When `--multi` is active (parallel):
 
-For each CONFLICT-A file that underwent full 3-way merge:
-
-1. **Read files**: Before version (current main) and after version (worktree)
-2. **Build relay prompt**: Construct Mode C comparative prompt from before + after content + criteria reference. Save to `.tmp/{SESSION_ID}_relay.txt`
-3. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh, run_in_background=true)`
-   - **Foreground**: Launch Claude **evaluator** agent for before/after comparison (via Task tool)
-4. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-5. **Consensus verdict**: Apply majority rule on improved/degraded/lateral across models
-
-Process files sequentially with circuit breaker (2 consecutive Codex failures → skip Codex for remaining files).
+For each CONFLICT-A file, run before/after evaluation with Codex in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: Mode C comparative template. Consensus: majority rule on verdict. Circuit breaker: 2 consecutive failures → skip Codex for remaining.
 
 ### When `--multi` is not active (single-model):
 
@@ -541,9 +453,9 @@ Present the upgrade results for user review:
 
 ### Next Actions
 
-- Run `/evaluate core` to verify module quality after upgrade
-- Run `/evolve <path>` on any degraded components
-- Review new additions from upstream for potential customization
+- `/evaluate {module} --multi --compare` — verify module quality against pre-upgrade baseline
+- `/evolve {degraded_path} --focus {area}` — improve components flagged as degraded during merge validation
+- Review {addition_count} new upstream additions for potential customization
 - Decision entry: `docs/decisions/{date}-upgrade-{version-slug}.md`
 ```
 
@@ -556,8 +468,8 @@ No upstream changes found. Ouroboros is at the latest version.
 
 ### Next Actions
 
-- Run `/evaluate core` to assess current module quality
-- Run `/research` to explore new patterns and methodologies
+- `/evaluate {module} --multi` — assess current module quality
+- `/research` — explore new patterns and methodologies
 ```
 
 ## Rules

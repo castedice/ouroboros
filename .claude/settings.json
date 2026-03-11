@@ -1,11 +1,19 @@
 {
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "90"
+  },
   "permissions": {
     "allow": [
       "WebSearch",
       "WebFetch",
       "Task",
       "Skill",
-      "Bash(bash */ouroboros/scripts/*)",
+      "Bash(bash scripts/*)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(jq *)",
+      "Bash(cat *)",
+      "Bash(git -C *)",
       "Bash(git worktree *)",
       "Bash(git diff *)",
       "Bash(git merge *)",
@@ -20,13 +28,12 @@
       "Bash(git remote *)",
       "Bash(gh *)",
       "Bash(which codex *)",
-      "Bash(which gemini *)",
       "Bash(codex *)",
-      "Bash(gemini *)",
       "Bash(trash *)",
       "Bash(mkdir -p .tmp*)",
       "Bash(mkdir -p .swe*)",
-      "Bash(mkdir -p .worktrees*)"
+      "Bash(mkdir -p .worktrees*)",
+      "Write(.tmp/*)"
     ],
     "deny": [
       "Bash(rm *)",

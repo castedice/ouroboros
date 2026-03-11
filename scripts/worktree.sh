@@ -39,6 +39,9 @@ action_create() {
   local branch="ouroboros/${operation}/${slug}"
   local worktree=".worktrees/${operation}-${slug}"
 
+  # Auto-prune stale worktrees before creating new one
+  action_prune >/dev/null 2>&1 || true
+
   # If branch already exists (prior aborted run), append timestamp
   if git rev-parse --verify "$branch" &>/dev/null; then
     local ts
@@ -130,14 +133,10 @@ action_merge() {
 
 # ─── Action: discard ───
 #   Args: <worktree-path>
+#   Delegates to cleanup (identical behavior, single implementation)
 
 action_discard() {
-  local worktree="${1:?Missing worktree path}"
-  local branch
-  branch=$(_get_branch "$worktree")
-
-  git worktree remove "$worktree" --force &>/dev/null || true
-  git branch -D "$branch" &>/dev/null || true
+  action_cleanup "$@"
 }
 
 # ─── Action: cleanup (idempotent) ───
@@ -240,8 +239,12 @@ action_scaffold() {
 # ─── Action: prune ───
 #   Args: none
 #   Removes ouroboros worktrees with last commit older than 24 hours
+#   Also unlocks stale lock files and runs git worktree prune
 
 action_prune() {
+  # Phase 1: Unlock stale lock files before pruning
+  _unlock_stale_worktrees
+
   local now pruned=0
   now=$(date +%s)
   local cutoff=$((now - 86400))
@@ -266,6 +269,9 @@ action_prune() {
     fi
   done < <(git worktree list 2>/dev/null)
 
+  # Phase 2: Clean up git internal worktree references
+  git worktree prune 2>/dev/null || true
+
   if [[ "$pruned" -eq 0 ]]; then
     echo "No stale worktrees to prune."
   else
@@ -274,6 +280,28 @@ action_prune() {
 }
 
 # ─── Helpers ───
+
+_unlock_stale_worktrees() {
+  local git_dir
+  git_dir=$(git rev-parse --git-dir 2>/dev/null) || return 0
+  local wt_dir="$git_dir/worktrees"
+  [[ -d "$wt_dir" ]] || return 0
+
+  for entry in "$wt_dir"/*/; do
+    [[ -d "$entry" ]] || continue
+    local name gitdir_file
+    name=$(basename "$entry")
+    gitdir_file="$entry/gitdir"
+    [[ -f "$gitdir_file" ]] || continue
+    local target
+    target=$(cat "$gitdir_file")
+    # Only unlock ouroboros worktrees whose target directory is gone
+    if [[ "$target" == *".worktrees/"* ]] && [[ -f "$entry/locked" ]] && [[ ! -d "$target" ]]; then
+      rm -f "$entry/locked"
+      echo "Unlocked stale: $name"
+    fi
+  done
+}
 
 _get_branch() {
   local worktree="$1"

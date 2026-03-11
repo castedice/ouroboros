@@ -1,12 +1,12 @@
 ---
 description: "Ship composite — orchestrate Integration Test, Security Review, Code Review, and Deploy Readiness to validate code for production"
-argument-hint: "<task-description> [--depth <global|per-stage>] [--artifact <optimization-report-path>]"
+argument-hint: "<task-description> [--fast] [--depth <global|per-stage>] [--artifact <path>] [--single]"
 allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
 
 # Ship — Ship Composite (Release Pipeline)
 
-Orchestrate the 4 ship stages sequentially — Integration Test, Security Review, Code Review, Deploy Readiness — to validate working code for production release.
+Orchestrate the ship stages — Integration Test, Security Review ‖ Code Review, Deploy Readiness — to validate working code for production release. At Standard+ depth, Security Review and Code Review execute as parallel Tasks for faster feedback.
 
 Target: $ARGUMENTS
 
@@ -15,8 +15,7 @@ Target: $ARGUMENTS
 | Phase | Agent | Role |
 |-------|-------|------|
 | 3 | implementer | Integration and e2e test execution |
-| 4 | reviewer | Dependency audit, secret detection, license compliance |
-| 5 | reviewer | 4-perspective code review (Architecture, Safety, Performance, Readability) |
+| 4 | reviewer × 2 | Security Review ‖ Code Review (parallel Tasks at Standard+ depth) |
 
 ## Phase 1: Parse Input
 
@@ -25,26 +24,25 @@ Extract from $ARGUMENTS:
 | Parameter | Source | Default |
 |-----------|--------|---------|
 | `task` | Positional text (everything not a flag) | Required — abort if empty |
+| `--fast` | Shortcut for `--depth Light` with relaxed skip conditions | Off |
 | `--depth` | Depth specification | Standard (global) |
 | `--artifact` | Path to Optimization Report (Stage 8) or Implementation artifact (Stage 6) | None (auto-discovered) |
+| `--single` | Force single-model mode (skip external CLIs). Multi-model auto-detected by default | — |
+
+**`--fast` mode**: Sets all stages to Light depth and enables relaxed skip conditions. If both `--fast` and `--depth` are present, `--depth` takes precedence.
 
 `--depth` accepts two formats:
 
 | Format | Example | Meaning |
 |--------|---------|---------|
-| Global | `--depth Deep` | All 4 ship stages at Deep depth |
+| Global | `--depth Deep` | All ship stages at Deep depth |
 | Per-stage | `--depth G:Std S:Std R:Deep D:Light` | Individual stage depths (G=inteGration, S=Security, R=Review, D=Deploy) |
 
-Parsing rules:
-
-- If single word (Light/Standard/Deep): apply to all 4 stages
-- If colon-separated pairs: parse each. Missing stages default to Standard
-- If any stage abbreviation is invalid: error and abort
-- If any depth value is invalid: error and abort
+Parsing rules per `skills/swe/methodology/references/depth-system.md`: single word applies globally, colon-separated pairs apply per-stage (missing stages default to Standard). Invalid abbreviations or values abort with error.
 
 If `task` is empty:
 
-- Output: "Error: Task description required. Usage: `/swe ship <task-description> [--depth <global|G:level S:level R:level D:level>] [--artifact <path>]`"
+- Output: "Error: Task description required. Usage: `/swe ship <task-description> [--depth <global|G:level S:level R:level D:level>] [--artifact <path>] [--multi]`"
 - Abort
 
 ### Artifact Resolution
@@ -63,15 +61,40 @@ If no entry artifact found:
 - Output: "Error: No implementation artifact found. Run `/swe dev` or `/swe implement` first, or provide `--artifact <path>`."
 - Abort
 
+### Multi-Model Setup (auto-detect)
+
+Skip if `--single` is specified.
+
+1. **CLI availability check**: Check `codex` CLI availability and version via Bash. Store: `codex_available` (bool + version), `failure_count: 0`.
+2. **Session temp directory**: If codex available, initialize session temp directory (`.tmp/{SESSION_ID}_*` pattern).
+
+Log availability:
+
+- Codex found: "Multi-model: Claude + Codex v{ver}"
+- Codex not found: "Single-model mode (no external CLIs found)"
+
+### Decision Matrix
+
+| Condition | Integration | Security Review | Code Review | Deploy | Multi-Model |
+|-----------|------------|-----------------|-------------|--------|-------------|
+| Standard (default) | Run | Run | Run | Standard checklist | Off |
+| `--fast` / Light | Run | Run | **Skip** | Light checklist | Off |
+| Deep | Run | Run (Deep) | Run (Deep) | Deep checklist | Off |
+| `--multi` | Run | Run + Codex | Run + Codex | Standard checklist | 2×2 grid |
+| `--multi` + Light | Run | Run + Codex | **Skip** | Light checklist | Security only |
+| No tests found | Skip (warn) | Run | Run | No test data | — |
+| P1 findings | — | — | — | **BLOCKED** | — |
+
 ## Phase 2: Depth Planning
 
 1. If `--depth` was provided, use parsed values
-2. If no `--depth`, apply depth defaults based on task characteristics:
+2. If `--fast` was provided (and no `--depth`), set all stages to Light and enable `fast_mode=true` — skip depth analysis
+3. If neither, apply depth defaults based on task characteristics:
    - Integration Test: Standard when cross-component boundaries exist; Light for single-component
    - Security Review: Standard for all projects with external dependencies; Deep for compliance scope
    - Code Review: Standard for production code; Light for internal tooling; Deep for security-critical paths
    - Deploy Readiness: Light for most tasks; Standard when deploy scripts exist; Deep for compliance-grade release
-3. Build Depth Plan:
+4. Build Depth Plan:
 
 ```text
 Depth Plan: G:{level} S:{level} R:{level} D:{level}
@@ -100,7 +123,7 @@ Execute integration and e2e tests by delegating to the implementer agent:
 > Agent: **implementer**
 
 - **Input**: Task description + source code file paths + existing test suites + depth level for Integration Test
-- **Instructions**: "Run all integration and e2e test suites using Bash. If no integration tests exist, run the full unit test suite as baseline validation. Report: total tests, pass count, fail count, error details for failures. Do not write new tests — only execute existing ones."
+- **Instructions**: Follow the Integration Test instruction template from `skills/swe/methodology/references/agent-instructions.md`.
 - **Expected output**: Test execution results with pass/fail counts
 
 1. Survey codebase for test directories and test runner configuration
@@ -112,63 +135,82 @@ Execute integration and e2e tests by delegating to the implementer agent:
 
 | Failure | Action |
 |---------|--------|
-| No test suites found | Log warning: "No integration tests found. Proceeding with Security Review." Skip to Phase 4 |
+| No test suites found | Log warning: "No integration tests found. Proceeding with reviews." Skip to Phase 4 |
 | Test execution error (build failure) | Log error. Present to user: "Build failed — fix build before shipping." Abort composite |
-| Some tests failing | Record failures. Proceed — Phase 6 will assess ship readiness |
+| Some tests failing | Record failures. Proceed — Phase 5 will assess ship readiness |
 | Agent timeout | Retry once with instruction: "Run test suite with 60s timeout." If retry fails: log warning, proceed |
 
-## Phase 4: Security Review
+## Phase 4: Security Review ‖ Code Review
 
-Execute security review by delegating to the reviewer agent:
+At Standard+ depth, Security Review and Code Review execute as parallel Tasks — both read implementation artifacts independently and produce separate findings. At Light depth, only Security Review executes (Code Review is skipped).
 
-> Agent: **reviewer**
+### Parallel Execution (Standard+ depth)
+
+Fan-out: Launch both reviews simultaneously as independent Tasks.
+
+**Task 1 — Security Review** (reviewer agent):
 
 - **Input**: Source code file paths + dependency manifests + depth level for Security Review
-- **Instructions**: "Execute Procedure 1 (Security Review) at {depth} depth. Run dependency audit commands if available. Scan for exposed secrets. At Standard+ depth, check license compliance. Return findings classified as P1/P2/P3."
+- **Instructions**: Follow the Security Review instruction template from `skills/swe/methodology/references/agent-instructions.md` at {depth} depth.
 - **Expected output**: Security findings with severity classification
 
+Steps:
 1. Identify dependency manifests and source code directories
 2. Delegate to reviewer
 3. Collect findings and classify by severity
 4. Log: "Security Review complete. {P1_count} P1, {P2_count} P2, {P3_count} P3 findings."
 
-### Phase 4 Recovery
-
-| Failure | Action |
-|---------|--------|
-| No dependency manifests found | Log: "No dependency files found. Skipping dependency audit." Proceed with secret detection only |
-| Audit tool not installed | Log: "Audit tool not available. Manual dependency review in findings." Proceed with available checks |
-| Agent timeout/error | Retry once with simplified instruction: "Scan source code for exposed secrets only." If retry fails: log warning, proceed to Phase 5 |
-
-## Phase 5: Code Review
-
-Execute code review by delegating to the reviewer agent:
-
-> Agent: **reviewer**
+**Task 2 — Code Review** (reviewer agent):
 
 - **Input**: Source code file paths + Architecture Spec + Constraint Profile + Interface Contracts + Verification Report + depth level for Code Review
-- **Instructions**: "Execute Procedure 2 (Code Review) at {depth} depth. Review from all 4 perspectives: Architecture, Safety, Performance, Readability. Classify each finding as P1/P2/P3. Reference the Architecture Spec for structural expectations and Constraint Profile for performance boundaries. Return findings with concrete fix suggestions."
+- **Instructions**: Follow the Code Review instruction template from `skills/swe/methodology/references/agent-instructions.md` at {depth} depth.
 - **Expected output**: Code review findings with severity classification from 4 perspectives
 
+Steps:
 1. Gather upstream artifacts from `.swe/active/` (architecture spec, constraint profile, interface contracts, verification report)
 2. Identify source code files modified or created for this task
 3. Delegate to reviewer with upstream artifact context
 4. Collect findings and classify by severity and perspective
 5. Log: "Code Review complete. {P1_count} P1, {P2_count} P2, {P3_count} P3 across {perspective_count} perspectives."
 
-### Phase 5 Recovery
+Fan-in: Merge findings from both Tasks into a unified findings list for Deploy Readiness. Combine all P1/P2/P3 findings — no deduplication needed between security and code review (different finding types).
 
-| Failure | Action |
-|---------|--------|
-| Missing upstream artifacts | Proceed with available artifacts. Instruct reviewer to note limited review scope |
-| Agent timeout/error | Retry once with simplified instruction: "Review for P1 issues only — correctness bugs, security vulnerabilities, data loss risk." If retry fails: log warning, proceed |
-| No source code files identified | Error: "No source code found for review. Verify the task produced implementation artifacts." Abort |
+### Multi-Model Fan-out (--multi only)
+
+When `--multi` is active, launch Codex background reviews alongside Claude Tasks for a 2×2 parallel grid:
+
+1. **Build relay prompts**: Construct Security Review and Code Review relay prompts using templates from `skills/swe/methodology/references/swe-relay-prompts.md`. Save to `.tmp/{SESSION_ID}_security_relay.txt` and `.tmp/{SESSION_ID}_review_relay.txt`.
+
+2. **Fan-out** (4 concurrent evaluations per `skills/core/routing/references/parallel-execution-pattern.md`):
+   - Background 1: Codex Security Review via `scripts/invoke-model.sh` (relay → `_codex_security.json`)
+   - Background 2: Codex Code Review via `scripts/invoke-model.sh` (relay → `_codex_review.json`)
+   - Task 1: Claude Security Review (reviewer agent — same as single-model)
+   - Task 2: Claude Code Review (reviewer agent — same as single-model)
+
+3. **Fan-in**: After Claude Tasks complete, collect Codex background results. Handle by exit code per parallel-execution-pattern.md.
+
+### Multi-Model Consensus (--multi only)
+
+Apply finding-level consensus per review type per `skills/core/routing/references/consensus-protocol.md`: union all findings, merge by location+type match, resolve severity disputes to the higher level (P1 disputes → P1 per DR-060). Codex-only findings are advisory. Log agreement rate.
 
 ### Light Depth Behavior
 
-At Light depth, skip Code Review entirely. Log: "Code Review skipped (Light depth). Integration test and security scan only."
+At Light depth, skip Code Review entirely. Execute Security Review only (single Task, no parallelism). Log: "Code Review skipped (Light depth). Integration test and security scan only."
 
-## Phase 6: Deploy Readiness
+When `--multi` + Light: only the Security Review gets multi-model treatment (1 Task + 1 Background).
+
+### Recovery
+
+| Failure | Action |
+|---------|--------|
+| Security Review Task fails | Retry once with simplified instruction: "Scan source code for exposed secrets only." If retry fails: proceed with Code Review results only |
+| Code Review Task fails | Retry once with simplified instruction: "Review for P1 issues only — correctness bugs, security vulnerabilities, data loss risk." If retry fails: proceed with Security Review results only |
+| Both Tasks fail | Retry each once. If both retries fail: log error, proceed to Deploy Readiness with empty findings and warning |
+| Codex background fails (--multi) | Skip Codex results for that review type. Log warning. Claude results are always sufficient |
+| No source code files identified | Error: "No source code found for review. Verify the task produced implementation artifacts." Abort |
+| No dependency manifests found | Log: "No dependency files found. Skipping dependency audit." Proceed with secret detection only |
+
+## Phase 5: Deploy Readiness
 
 Assess overall ship readiness based on all findings:
 
@@ -234,7 +276,7 @@ If no deploy configuration exists:
 - Present the deploy checklist only
 - Note: "No deploy script detected. Manual deployment required."
 
-## Phase 7: Review
+## Phase 6: Review
 
 Present the complete ship results:
 
@@ -270,33 +312,35 @@ Present the complete ship results:
 {If CLEAR: deploy checklist}
 ```
 
-Write Ship Report to `.swe/active/09-ship.md` following the template at `templates/swe/ship-report.md`.
-
-## Phase 8: Report
+When `--multi` is active, append to the report:
 
 ```markdown
-## Ship Complete: {task summary}
+### Multi-Model Review Summary
 
-**Depth Plan**: G:{level} S:{level} R:{level} D:{level}
-**Status**: {CLEAR — ready to deploy / BLOCKED — {n} P1 issues}
+| Review Type | Claude Findings | Codex Findings | Merged | Agreement |
+|-------------|----------------|----------------|--------|-----------|
+| Security | {n} | {m} | {k} | {rate}% |
+| Code Review | {n} | {m} | {k} | {rate}% |
 
-### Next Steps
-{If BLOCKED}:
-- Fix P1 issues, then re-run: `/swe ship "{task}"`
-- Individual fixes: `/swe implement "{task}"` for code changes
-
-{If CLEAR}:
-- Proceed to feedback and retrospect: `/swe tune "{task}" --artifact .swe/active/09-ship.md`
-
-### Full Pipeline Reference
-- `/swe dev "{task}"` — return to development (Stages 5-8)
-- `/swe spec "{task}"` — return to specification (Stages 1-4)
-- `/swe spiral "{task}"` — full engineering cycle (spec + dev + ship + tune)
-
-### Individual Stage Review
-- `/swe ship "{task}" --depth G:Std` — re-run integration tests only
-- `/swe ship "{task}" --depth S:Std` — re-run security review only
+Codex-only findings are marked with † in the findings tables above.
 ```
+
+Write Ship Report to `.swe/active/09-ship.md` following the template at `templates/swe/ship-report.md`.
+
+## Phase 7: Report
+
+Summary of Phase 6 with actionable next steps:
+
+- **If BLOCKED**: `/swe ship "{task}"` (re-run after P1 fixes), `/swe implement "{task}"` (code changes)
+- **If CLEAR**: `/swe tune "{task}" --artifact .swe/active/09-ship.md` (feedback + retrospect)
+- **Pipeline**: `/swe dev`, `/swe spec`, `/swe spiral` for upstream stages
+- **Stage re-run**: `/swe ship "{task}" --depth G:Std` (integration only), `--depth S:Std` (security only)
+
+### See Also
+- **Reviewer agent** (`agents/swe/reviewer.md`) — executes security and code review
+- **Implementer agent** (`agents/swe/implementer.md`) — executes integration tests
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
+- **SWE Relay Prompts** (`skills/swe/methodology/references/swe-relay-prompts.md`) — external model review templates
 
 ## Rules
 
@@ -304,11 +348,8 @@ Write Ship Report to `.swe/active/09-ship.md` following the template at `templat
 - The reviewer agent is read-only — it produces findings but never modifies code
 - P1 gate is non-negotiable: P1 findings block ship. No override, no exception
 - Artifact paths follow `.swe/active/09-ship.md` convention
-- User checkpoint occurs at Phase 7 (Review) — individual stages do not pause for user review when run as part of ship
-- At Light depth, Code Review (Phase 5) is skipped — only Integration Test and Security Review execute
+- User checkpoint occurs at Phase 6 (Review) — individual stages do not pause for user review when run as part of ship
 - Deploy execution requires explicit user confirmation — never auto-deploy
-- Failure isolation: each stage can fail independently. Prior completed stages remain valid
-- The ship composite consumes Optimization Report (Stage 8 output) or Implementation artifact (Stage 6 output) as its entry artifact
-- The ship composite produces a Ship Report consumed by the tune composite for retrospect analysis
-- Security Review runs before Code Review — security issues take precedence
-- Graceful degradation: missing upstream artifacts reduce review scope but do not abort. Missing tests produce a warning but do not block security/code review
+- Failure isolation: each review can fail independently. The other review's results remain valid
+- The ship composite consumes Optimization Report (Stage 8) or Implementation artifact (Stage 6) and produces a Ship Report consumed by the tune composite
+- Graceful degradation: missing upstream artifacts reduce review scope but do not abort. Missing tests produce a warning but do not block reviews

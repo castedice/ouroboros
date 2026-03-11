@@ -1,6 +1,6 @@
 ---
 description: Improve an existing plugin component — analyze weaknesses, plan changes, apply, and validate with before/after evaluation
-argument-hint: <file-path|module-name> [--eval <report>] [--focus <criteria>] [--multi]
+argument-hint: <file-path|module-name> [--eval <report>] [--focus <criteria>] [--single]
 allowed-tools: Read, Glob, Grep, Edit, Write, Bash, Task
 ---
 
@@ -31,12 +31,48 @@ Options:
 
 - `--eval <report>`: Existing evaluation results. Skips Phase 2 if provided
 - `--focus <criteria>`: Focus on specific criteria (e.g., C3, C5)
-- `--multi`: Enable multi-model validation in Phase 6 (Claude + Codex parallel evaluation)
+- `--single`: Force single-model mode (skip external CLIs). By default, multi-model is auto-detected — if codex CLI is installed, Codex runs in parallel
 
 If no argument provided:
 
 - Output error: "Error: No target specified. Usage: `/evolve <file-path|module-name> [--eval <report>] [--focus <criteria>]`"
 - Abort
+
+### State Verification
+
+**Mode A** (file-path):
+
+1. Verify file exists → else "Error: File '{path}' not found."
+2. Verify `.md` extension → else "Error: Not a markdown component. Only `.md` files can be evolved."
+3. Verify in plugin structure (`commands/`, `agents/`, `skills/`, `templates/`) → else "Warning: File not in standard plugin directory. Proceeding, but evaluation criteria may not apply."
+
+**Mode B** (module-name):
+
+1. Scan `commands/{module}/`, `agents/{module}/`, `skills/{module}/`
+2. If none exist → "Error: Module '{module}' not found. Available modules: {list from `commands/*/`}."
+3. Abort on error
+
+**Ambiguous input** (argument matches both a file and a module name): prefer file (Mode A), log note: "Interpreting as file path. Use directory name for module mode."
+
+## Branch Summary
+
+All conditional branches that affect command behavior, consolidated for quick reference.
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| Target | File path (Mode A) | All | Improve a single component |
+| Target | Module name (Mode B) | 2 expanded | Evaluate module, select weakest, evolve as Mode A |
+| `--eval <report>` | Provided | 2 skipped | Use existing evaluation results |
+| `--eval` | Not provided (default) | 2 runs | Run baseline evaluation first |
+| `--focus <criteria>` | Provided | 3 | Researcher focuses analysis on specific criteria |
+| `--single` | true | 6 | Claude evaluator only for validation |
+| `--single` | false (default) | 6 | Auto-detect: if codex CLI installed, parallel validation |
+| Ambiguous input | Matches file and module | — | Prefer file (Mode A), log note |
+| Existing worktree | Found | 4: Session Recovery | User chooses Resume / Discard / create fresh |
+| Validation verdict | `improved` | 7, 8 | Proceed to decision record + review |
+| Validation verdict | `lateral` | 7, 8 | Proceed to review with note |
+| Validation verdict | `degraded` (1st) | 3–6 retry | Auto-rollback, retry with adjusted approach |
+| Validation verdict | `degraded` (2nd) | 8 | Stop retrying, report to user for direction |
 
 ## Phase 2: Baseline Evaluation
 
@@ -65,30 +101,10 @@ Analysis runs Claude researcher for deep knowledge-base-integrated analysis. Whe
 
 ### When `--multi` is active (parallel):
 
-1. **Build researcher relay prompt**: Construct from evaluation report + component content + analysis instructions. Save to `.tmp/{SESSION_ID}_researcher_relay.txt`
-
-   **Section 1 — Role** (fixed template):
-
-   ```text
-   You are an independent research analyst. Your task is to analyze a plugin component that received a quality evaluation, diagnose root causes of low scores, and propose improvement directions. Do not assume any prior context — analyze based solely on the content and evaluation given.
-   ```
-
-   **Section 2 — Content**: Evaluation report + target file content (verbatim).
-
-   **Section 3 — Methodology**:
-
-   ```text
-   Follow this procedure:
-   1. Parse the evaluation report: identify 0-score criteria and [HIGH]/[MED] improvements
-   2. For each 0-score criterion, diagnose root cause: Missing (content absent), Format error (wrong form), Insufficient depth (lacks specificity)
-   3. For each root cause, prescribe a specific fix with example snippet
-   4. Prioritize improvements by score impact
-   ```
-
-   **Section 4 — Response Format**: JSON with `root_causes`, `improvements`, `recommendations` arrays.
+1. **Build researcher relay prompt**: Construct from template at `skills/core/evolution/references/researcher-relay-prompt.md` — assemble 4 sections (Role, Content, Methodology, Response Format) with evaluation report + component content inserted as Section 2. Save to `.tmp/{SESSION_ID}_researcher_relay.txt`
 
 2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_researcher_relay.txt .tmp/{SESSION_ID}_codex_analysis.json high, run_in_background=true)`
+   - **Background**: `Bash(invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_researcher_relay.txt .tmp/{SESSION_ID}_codex_analysis.json high, run_in_background=true)`
    - **Foreground**: Launch Claude **researcher** agent (via Task tool) with same inputs
 
 3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
@@ -176,24 +192,21 @@ Create an isolated worktree for applying changes:
 
 Validation runs as before/after comparison — functionally equivalent to `/evaluate` Mode C. When `--multi` is active, Claude and Codex evaluate in parallel. See `skills/core/routing/references/parallel-execution-pattern.md`.
 
-### When `--multi` is active (parallel):
-
-1. **Read after file**: Read the modified file from the worktree
-2. **Build relay prompt**: Construct Mode C comparative prompt from before content + after content + criteria reference. Save to `.tmp/{SESSION_ID}_relay.txt`
-3. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh, run_in_background=true)`
-   - **Foreground**: Launch Claude **evaluator** agent for before/after comparison (via Task tool):
-     - Input: Before content (from Phase 5 snapshot) + After content (worktree file) + component type
-     - Instructions: "Evaluate both versions independently with static criteria. Perform pairwise comparison with position swap. Check for regressions. Return verdict: improved/degraded/lateral."
-4. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3 Step 3
-5. **Consensus verdict**: Apply majority rule on improved/degraded/lateral across models
-
-### When `--multi` is not active (single-model):
+### Evaluator Instructions
 
 1. **Read after file**: Read the modified file from the worktree
 2. Launch **evaluator** agent for before/after comparison (via Task tool):
    - Input: Before content (from Phase 5 snapshot) + After content (worktree file) + component type
    - Instructions: "Evaluate both versions independently with static criteria. Perform pairwise comparison with position swap. Check for regressions. Return verdict: improved/degraded/lateral."
+
+### `--multi` Extension
+
+When `--multi` is active, run Codex evaluator in parallel:
+
+1. **Build relay prompt + init manifest**: Construct Mode C comparative prompt from template at `skills/core/evaluation/references/evaluator-relay-prompts.md`. Save to `.tmp/{SESSION_ID}_relay.txt`. Init manifest via `bash scripts/parallel.sh init "$SESSION_ID" '[{"idx":0,"model":"codex","file":".tmp/{SESSION_ID}_codex_eval.json"}]'`
+2. **Fan-out**: Background Codex (`invoke-model.sh codex ... xhigh`) + Foreground Claude evaluator (as above)
+3. **Fan-in**: Verify results via `bash scripts/parallel.sh collect "$SESSION_ID"`. Then handle exit codes per `evaluate.md` Phase 3 Step 3
+4. **Consensus verdict**: Apply majority rule on improved/degraded/lateral across models
 
 ### Interpret Result
 

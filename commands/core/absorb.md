@@ -1,6 +1,6 @@
 ---
 description: Absorb external sources into the modular monolith — orchestrate Research + Evaluate + Generate/Evolve to transform external patterns into internal modules or components
-argument-hint: <path|url|topic> [--into <module>] [--reference <module>] [--multi]
+argument-hint: <path|url|topic> [--into <module>] [--reference <module>] [--single]
 allowed-tools: Read, Glob, Grep, WebFetch, WebSearch, Write, Bash, Task
 ---
 
@@ -36,7 +36,7 @@ Extract arguments from $ARGUMENTS:
 | `source` | Yes | Path (file or directory), URL (`http://` or `https://`), or topic keyword |
 | `--into` | No | Target module name for Mode B integration (must exist) |
 | `--reference` | No | Reference module for pattern matching (default: `core`) |
-| `--multi` | No | Enable multi-model analysis in Phase 3 (Claude + Codex parallel researcher, cherry-pick), Phase 5 (Claude + Codex parallel gap analysis, synthesis), and Phase 8 (Claude + Codex parallel evaluator, consensus) |
+| `--single` | No | Force single-model mode (skip external CLIs). By default, multi-model is auto-detected — if codex CLI is installed, Codex runs in parallel for research (Phase 3), gap analysis (Phase 5), and evaluation (Phase 8) |
 
 ### Source Type Detection
 
@@ -89,6 +89,10 @@ Collect raw content from the external source. This phase handles all network acc
    - Check parent directory for related files if it appears to be part of a plugin
 4. Log: "Found {N} files from local source."
 
+### WebFetch Constraints (Web Source + Topic)
+
+> Content passes through a Haiku summarization layer — raw source text is never returned. Pages over 100KB are truncated (tail content lost). Authenticated pages and JS-rendered SPAs return empty or partial content. If a URL yields thin results, try topic mode with alternative search terms.
+
 ### Web Source
 
 1. WebFetch the provided URL
@@ -122,59 +126,24 @@ Research analysis runs Claude researcher for deep knowledge-base-integrated anal
 
 **IMPORTANT**: The command passes all collected content to the researcher agent. The researcher agent is read-only and does not access the network — all network access happens in Phase 2.
 
-### When `--multi` is active (parallel):
-
-1. **Build researcher relay prompt**: Construct from collected source content + analysis instructions. Save to `.tmp/{SESSION_ID}_researcher_relay.txt`
-
-   **Section 1 — Role** (fixed template):
-
-   ```text
-   You are an independent research analyst. Your task is to analyze the provided source content and extract architectural patterns, design decisions, conventions, and a component inventory for absorption into a plugin system. Produce a structured research analysis. Do not assume any prior context — analyze based solely on the content given.
-   ```
-
-   **Section 2 — Content**: All collected source content from Phase 2 (verbatim) + source type + mode (A or B).
-
-   **Section 3 — Methodology**:
-
-   ```text
-   Follow this procedure:
-   1. Scan all provided content. Identify scope: plugin structure, file types, key files
-   2. Extract patterns: naming conventions, structure, design decisions, techniques, trade-offs
-   3. Build component inventory: capabilities with types (command/agent/skill/template candidates)
-   4. Mode-specific: {Mode A: suggest module name with rationale | Mode B: map integration points to existing module structure}
-   5. Suggest 3-7 tags for categorization
-   ```
-
-   **Section 4 — Response Format**: JSON with `key_findings`, `component_inventory`, `architectural_patterns`, `mode_specific` (module name or integration points), `suggested_tags` arrays.
-
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_researcher_relay.txt .tmp/{SESSION_ID}_codex_analysis.json high, run_in_background=true)`
-   - **Foreground**: Launch Claude **researcher** agent (via Task tool) with all collected content
-
-3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-
-4. **Cherry-pick merge**: Review both analysis reports and build a unified Research Analysis:
-   - Union of all key findings and component inventory items from both models
-   - Prefer findings with stronger evidence citations
-   - Novel insights from Codex that Claude missed are highlighted as "External insight"
-   - If Codex analysis failed or is partial, proceed with Claude-only analysis
-   - Merged analysis feeds into Phase 4 (Knowledge Entry) and Phase 5 (Gap Analysis)
-
-### When `--multi` is not active (single-model):
+### Researcher Instructions
 
 Launch the **researcher** agent via Task tool:
 
 - **Input**: All collected source content + source type + original target + mode (A or B)
-- **Instructions**:
-  - "Perform Research Analysis on the provided content."
-  - "Source type: {source type}. Mode: {A or B}."
-  - "Required output sections: (1) Key Findings — top 3-5 patterns with evidence, (2) Component Inventory — capabilities with types (command/agent/skill candidates), (3) Architectural Patterns — structural decisions worth preserving, (4) Mode-specific: {Mode A: suggested module name with rationale | Mode B: integration points mapped to existing module structure}, (5) Suggested Tags — for knowledge entry."
-- **Expected output**: Research Analysis Report (structured per above sections)
+- **Instructions**: "Perform Research Analysis on the provided content. Source type: {source type}. Mode: {A or B}."
+- **Required output**: Research Analysis Report — (1) Key Findings with evidence, (2) Component Inventory with types, (3) Architectural Patterns, (4) Mode-specific: {Mode A: module name suggestion | Mode B: integration points}, (5) Suggested Tags
 
-Parse the researcher's report to extract:
+### `--multi` Extension
+
+When `--multi` is active, run Codex researcher in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: `skills/core/absorption/references/researcher-relay-prompt.md` — wrap collected source content in `<<<UNTRUSTED_CONTENT_START>>>` / `<<<UNTRUSTED_CONTENT_END>>>` markers before inserting as Section 2. Merge strategy: cherry-pick (union of findings, prefer stronger evidence, novel Codex insights marked "External insight"). Codex failure → Claude-only.
+
+### Parse Results
+
+Extract from the researcher's report (or merged analysis when `--multi`):
 
 1. **Key findings**: patterns, conventions, architectural decisions
-2. **Component inventory**: what capabilities/components the source offers
+2. **Component inventory**: capabilities with types
 3. **Suggested module name** (Mode A) or **integration points** (Mode B)
 4. **Suggested tags** for the knowledge entry
 
@@ -187,11 +156,11 @@ Build a knowledge entry from the researcher's report (same structure as `/resear
 1. **Title**: Derive from the source and research focus
 2. **Frontmatter**:
    - `title`: the derived title
-   - `tags`: researcher's suggested tags + relevant existing tags from `docs/knowledge/`
+   - `tags`: researcher's suggested tags + relevant existing tags from `docs/specs/knowledge/`
    - `source`: original source (path, URL, or topic)
    - `created`: today's date (YYYY-MM-DD)
    - `status`: `active`
-   - `related`: scan existing entries in `docs/knowledge/` for 30%+ tag overlap. List matching filenames (e.g., `[llm-as-judge-evaluation.md]`). Empty `[]` if no overlap found
+   - `related`: scan existing entries in `docs/specs/knowledge/` for 30%+ tag overlap. List matching filenames (e.g., `[llm-as-judge-evaluation.md]`). Empty `[]` if no overlap found
 3. **Body**: Structure from the Research Analysis Report
    - Overview — what was analyzed and why
    - Key Patterns — conventions, techniques, design decisions
@@ -201,18 +170,9 @@ Build a knowledge entry from the researcher's report (same structure as `/resear
 
 Use `templates/core/knowledge-entry.md` as the structural guide.
 
-4. **Deduplication check**:
-   - Glob `docs/knowledge/*.md` and read frontmatter (title + tags) of each entry
-   - Compare tags: if >= 50% tag overlap with any existing entry, flag as "high overlap"
-   - For high-overlap entries, read the body and compare key patterns
-   - If substantial content overlap → merge approach: extend the existing entry rather than creating a new one
-   - If distinct angle on shared topic → proceed with new entry, note the related entry in References
-   - **Minimum depth**: knowledge entry body must contain at least 3 distinct actionable patterns not already present in overlapping entries
+4. **Deduplication check**: Scan existing entries in `docs/specs/knowledge/*.md` for tag and content overlap per `skills/core/absorption/references/deduplication-rules.md`. Outcomes: no overlap → proceed, high overlap with distinct angle → new entry with cross-reference, substantial content overlap → extend existing entry. New entries must contain at least 3 distinct actionable patterns not in overlapping entries.
 
-5. **Supersession check** (when high overlap detected):
-   - If the new entry substantially replaces an existing entry's content (>80% pattern coverage + more recent source), flag for supersession in Phase 10 review:
-     - "Suggest: mark `{existing-entry}` as `status: superseded` with `superseded_by: {new-entry}` — the new entry covers its content with updated findings."
-   - Do not auto-supersede — present as a recommendation for user decision during Phase 10 review
+5. **Supersession check** (when high overlap detected): If new entry covers >80% of existing entry's patterns with more recent source, flag for Phase 10 user review as supersession recommendation. Do not auto-supersede.
 
 Log: "Knowledge entry drafted: {title} (overlap: {none|low|high with {existing-entry}})"
 
@@ -273,88 +233,28 @@ Log: "Module '{name}' designed: {N} commands, {M} agents, {K} skills planned."
 
 > Agent: **evaluator** + Bash background (when `--multi`)
 
-Gap analysis runs Claude evaluator for deep capability comparison. When `--multi` is active, Codex runs in parallel for independent analysis — synthesis mode combines both perspectives into a comprehensive gap report. See `skills/core/routing/references/parallel-execution-pattern.md`.
+Gap analysis runs Claude evaluator for deep capability comparison. When `--multi` is active, Codex runs in parallel for independent analysis — synthesis mode combines both perspectives. See `skills/core/routing/references/parallel-execution-pattern.md`.
 
 1. **Scan existing module**: Read all components of the target module:
-   - `Glob: commands/{module}/*.md`
-   - `Glob: agents/{module}/*.md`
-   - `Glob: skills/{module}/**/*.md`
-   - `Glob: templates/{module}/*.md`
+   - `Glob: commands/{module}/*.md`, `agents/{module}/*.md`, `skills/{module}/**/*.md`, `templates/{module}/*.md`
    - Read each file to understand current capabilities
-
-#### When `--multi` is active (parallel):
-
-1. **Build gap analysis relay prompt**: Construct from source component inventory + existing module contents + gap analysis instructions. Save to `.tmp/{SESSION_ID}_gap_relay.txt`
-
-   **Section 1 — Role** (fixed template):
-
-   ```text
-   You are an independent capability analyst. Your task is to compare a source's capabilities against an existing plugin module and identify gaps, overlaps, and conflicts. Produce a structured gap analysis. Do not assume any prior context — analyze based solely on the content given.
-   ```
-
-   **Section 2 — Content**: Source component inventory (from Phase 3) + existing module component contents (verbatim) + module name.
-
-   **Section 3 — Methodology**:
-
-   ```text
-   Follow this procedure:
-   1. Catalog existing module capabilities (per component)
-   2. Catalog source capabilities (from component inventory)
-   3. Compare: classify each source capability as gap (missing), overlap (covered), or conflict (contradicts)
-   4. For gaps: determine component type and suggest name
-   5. Prioritize gaps by impact (critical functionality first)
-   ```
-
-   **Section 4 — Response Format**: JSON with `gaps` (array of {capability, type, name, priority, rationale}), `overlaps` (array of {capability, existing_component}), `conflicts` (array of {capability, source_approach, existing_approach}).
-
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_gap_relay.txt .tmp/{SESSION_ID}_codex_gap.json high, run_in_background=true)`
-   - **Foreground**: Launch Claude **evaluator** agent (via Task tool) for gap analysis
-
-3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-
-4. **Synthesis merge**: Combine both gap analyses into a unified report:
-   - Union of all gaps from both models (deduplicate by capability name)
-   - If both models identify the same gap, merge their rationale and use the higher priority
-   - Gaps identified by only one model are included but marked with source ("Claude-only" or "Codex-only")
-   - Conflicts identified by either model are included (conservative — false positive conflicts are safer than missed ones)
-   - If Codex analysis failed, proceed with Claude-only analysis
-
-#### When `--multi` is not active (single-model):
 
 2. **Gap analysis**: Launch **evaluator** agent via Task tool:
    - **Input**: Source component inventory (from Phase 3) + existing module component contents + module name
-   - **Instructions**: "Perform gap analysis. Compare the source's capabilities against the existing module. Identify: (1) capabilities present in source but missing from module (gaps to fill), (2) capabilities that overlap (no action needed), (3) capabilities that conflict (require user decision). Return a Gap Analysis Report with prioritized gaps."
+   - **Instructions**: "Perform gap analysis. Compare source capabilities vs existing module. Classify each as gap (missing), overlap (covered), or conflict (contradicts). Return Gap Analysis Report with prioritized gaps."
    - **Expected output**: Gap Analysis Report (gaps, overlaps, conflicts)
 
-3. **Filter actionable gaps**: From the gap analysis:
-   - Select gaps that can be filled with new components (commands, agents, skills, templates)
-   - For each gap, determine component type and name
-   - If conflicts found → log them for the review phase
-   - If no gaps found → Log "No gaps identified. Source capabilities already covered by module." → Skip to Phase 7 (record knowledge entry only)
+#### `--multi` Extension
 
-4. **High-overlap checkpoint** (Mode B only):
-   - If overlap count > gap count AND gap count <= 2:
-     - Present to user:
+When `--multi` is active, run Codex gap analyst in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: `skills/core/absorption/references/gap-analysis-relay-prompt.md`. Merge strategy: synthesis (union of gaps, deduplicate by capability, conflicts from either model included). Codex failure → Claude-only.
 
-       ```markdown
-       Gap Analysis Summary:
+#### Process Results
 
-       - Overlaps: {M} capabilities already covered
-       - Gaps: {N} remaining ({list brief descriptions})
-       - Conflicts: {K}
+3. **Filter actionable gaps**: Select gaps fillable with new components. For each gap, determine component type and name. Conflicts → log for review phase. No gaps → Log "No gaps identified." → Skip to Phase 7 (knowledge entry only)
 
-       The source is largely reflected in the existing module.
-       Proceed with component generation for {N} gaps, or record knowledge entry only?
-       ```
+4. **High-overlap checkpoint**: If overlap count > gap count AND gap count <= 2, present summary and offer: proceed with generation or record knowledge entry only. Otherwise → proceed automatically
 
-     - On "knowledge only" → Skip to Phase 7 (record knowledge entry only)
-     - On "proceed" → continue to Phase 6
-   - Otherwise → proceed to Phase 6 automatically
-
-5. **Reference components**: For each component type to generate:
-   - Identify 1-2 existing components of the same type (prefer same module, then `core/`)
-   - Read evaluation criteria: `skills/core/evaluation/references/{type}-criteria.md`
+5. **Reference components**: For each component type to generate, identify 1-2 existing same-type components (prefer same module, then `core/`). Read evaluation criteria: `skills/core/evaluation/references/{type}-criteria.md`
 
 Log: "Gap analysis complete. {N} gaps to fill, {M} overlaps, {K} conflicts."
 
@@ -407,11 +307,7 @@ Log: "Generation complete. {N} components generated."
 
 After generation, analyze which existing components should be evolved to integrate the new additions:
 
-1. **Scan for consumers**: For each generated component:
-   - If **skill**: search `commands/{module}/*.md` for phases where this knowledge applies (e.g., a validation skill → commands with evaluation phases)
-   - If **agent**: search `commands/{module}/*.md` for phases that delegate to related domains
-   - If **command**: search `skills/{module}/` and `agents/{module}/` for overlapping capabilities
-   - If **template**: identify commands that produce the same document type
+1. **Scan for consumers**: For each generated component, search existing same-module components for phases or sections where the new component should be referenced. Cross-reference by component type (skills → commands that apply them, agents → commands that delegate to them, etc.)
 
 2. **Produce integration list**:
 
@@ -463,10 +359,10 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/worktree.sh prune
 
 Write the knowledge entry (from Phase 4) to the worktree:
 
-1. Generate filename: `docs/knowledge/{slugified-title}.md`
+1. Generate filename: `docs/specs/knowledge/{slugified-title}.md`
 2. Check if file already exists in main branch:
    - If exists → append version suffix (e.g., `-v2`)
-3. Write: `.worktrees/absorb-{slug}/docs/knowledge/{filename}.md`
+3. Write: `.worktrees/absorb-{slug}/docs/specs/knowledge/{filename}.md`
 
 ### 7c: Write Generated Components
 
@@ -506,30 +402,15 @@ Log: "{N} files written to worktree ({M} components + 1 knowledge entry)."
 
 > Agent: **evaluator**, **generator** (on retry) + Bash background (when `--multi`)
 
-Apply the [Quality Gate Procedure](../../skills/core/validation/references/quality-gate-procedure.md) to validate generated components. When `--multi` is active, Claude and Codex evaluate in parallel for consensus scoring. See `skills/core/routing/references/parallel-execution-pattern.md`.
+Apply the [Quality Gate Procedure](../../skills/core/validation/references/quality-gate-procedure.md) to validate generated components (commands, agents, skills — templates excluded). When `--multi` is active, Claude and Codex evaluate in parallel per `skills/core/routing/references/parallel-execution-pattern.md`.
 
 **If no generated components (Mode B, no gaps):** Skip to Phase 9.
 
-### When `--multi` is active (parallel):
+For each component, run Mode A static evaluation. Quality gate threshold: Level >= 2. On failure, retry with Claude generator (max 1 retry).
 
-For each generated command, agent, and skill (templates excluded):
+### `--multi` Extension
 
-1. **Build relay prompt**: Construct Mode A static evaluation prompt from component content + criteria reference. Save to `.tmp/{SESSION_ID}_relay.txt`
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh, run_in_background=true)`
-   - **Foreground**: Launch Claude **evaluator** agent (via Task tool) for static evaluation
-3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-4. **Consensus**: Apply per-criterion majority rule (same as `evaluate.md` Phase 5.5). Consensus score determines pass/fail
-
-Process components sequentially with circuit breaker (2 consecutive Codex failures → skip Codex for remaining components).
-
-Quality gate threshold remains Level >= 2 (same as single-model). On failure, retry uses Claude generator only.
-
-### When `--multi` is not active (single-model):
-
-Evaluate each generated command, agent, and skill (templates excluded).
-
-Apply the Quality Gate Procedure as defined.
+When `--multi` is active, run Codex evaluator in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: `skills/core/evaluation/references/evaluator-relay-prompts.md`. Consensus: per-criterion majority rule per `skills/core/routing/references/consensus-protocol.md`. Circuit breaker: 2 consecutive Codex failures → skip for remaining.
 
 Log quality validation results and proceed to Phase 9.
 
@@ -579,7 +460,7 @@ Present the absorption results for user review:
 
 ### Knowledge Entry
 
-- `docs/knowledge/{filename}.md` ({tags})
+- `docs/specs/knowledge/{filename}.md` ({tags})
 
 ### Generated Components
 
@@ -636,7 +517,7 @@ Present the absorption results for user review:
 
 ### Knowledge Entry
 
-- `docs/knowledge/{filename}.md`
+- `docs/specs/knowledge/{filename}.md`
 - Tags: {tags}
 - Related entries: {list entries with overlapping tags, or "None"}
 
@@ -644,7 +525,7 @@ Present the absorption results for user review:
 
 | Path | Type | Score |
 |------|------|-------|
-| `docs/knowledge/{filename}.md` | knowledge | — |
+| `docs/specs/knowledge/{filename}.md` | knowledge | — |
 | `{component-path}` | {type} | {score}/5 |
 | ... | ... | ... |
 

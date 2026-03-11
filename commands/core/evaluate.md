@@ -1,6 +1,6 @@
 ---
 description: Evaluate plugin component quality — static definition scoring, output quality assessment, or before/after comparison
-argument-hint: <file-path|module-name> [--output <output-path>] [--before <path>] [--after <path>] [--multi [--unanimous]] [--save] [--compare [<baseline>]]
+argument-hint: <file-path|module-name> [--output <output-path>] [--before <path>] [--after <path>] [--single] [--unanimous] [--no-save] [--compare [<baseline>]]
 allowed-tools: Read, Glob, Grep, Task, Bash
 ---
 
@@ -14,6 +14,7 @@ Target: $ARGUMENTS
 
 | Phase | Agent/Tool | Role |
 |-------|-----------|------|
+| 2.5 | — (command) | Structural validation (Mode A/B only, informational) |
 | 3 | evaluator (agent) + Bash background (--multi) | Claude evaluation (foreground) + Codex evaluation (background, parallel) |
 | 4, 5, 6 | evaluator (agent) | Criteria-based scoring (read-only) |
 | 5.5 | — (command) | Consensus integration (--multi only) |
@@ -33,36 +34,40 @@ Determine evaluation mode from $ARGUMENTS:
 
 ### Persistence Flags
 
-| Flag | Effect |
-|------|--------|
-| `--save` | Persist evaluation results to `dev/evaluations/` as JSON |
-| `--compare [<baseline>]` | Compare with previous run (implies `--save`). Optional baseline path |
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--save` | **on** | Persist evaluation results to `dev/evaluations/` as JSON |
+| `--no-save` | — | Disable persistence (skip JSON output) |
+| `--compare [<baseline>]` | — | Compare with previous run (implies `--save`). If no baseline path, auto-discover `dev/evaluations/{module}-latest.json` |
 
-If `--compare` is used, `--save` is automatically enabled.
+Persistence is on by default — results are always saved unless `--no-save` is specified. If `--compare` is used without a baseline path, auto-discover the latest baseline via `dev/evaluations/{module}-latest.json` symlink (managed by `scripts/regression.sh`).
 
 ### Multi-Model Flags
 
-| Flag | Effect |
-|------|--------|
-| `--multi` | Enable multi-model evaluation (Claude + external models) |
-| `--unanimous` | Require unanimous agreement across models (only with `--multi`) |
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--multi` | **auto** | Auto-detect: if codex CLI installed, enable multi-model. Explicit flag forces multi even on first check |
+| `--single` | — | Force single-model evaluation (skip external CLIs) |
+| `--unanimous` | off | Require unanimous agreement across models (only with multi-model) |
+| `--sequential` | off | Disable batch parallelism in Mode B (evaluate components one at a time) |
 
-If `--unanimous` without `--multi`: warn "⚠ --unanimous requires --multi. Ignoring." and continue single-model.
+If `--unanimous` without multi-model active: warn "⚠ --unanimous requires multi-model. Ignoring." and continue single-model.
 
-### CLI Availability Check (only when `--multi`)
+### CLI Availability Check (auto-detect)
 
-Check `codex` and `gemini` CLI availability and versions via Bash. Store: `codex_available` (bool + version), `gemini_available` (bool + version), `failure_count` ({ codex: 0, gemini: 0 }).
+Check `codex` CLI availability and version via Bash. Store: `codex_available` (bool + version), `failure_count` ({ codex: 0 }).
 
-### Session Temp Directory (only when `--multi`)
+- If `--single` specified: skip check, use single-model
+- Otherwise: auto-detect CLIs
 
-Generate a short session ID (first segment of UUID) and ensure `.tmp/` directory exists. All temp files use the pattern `.tmp/{SESSION_ID}_{purpose}.txt`. Files are cleaned up at the end of the command run (see Rules).
+### Session Temp Directory
+
+Always generate a short session ID (first segment of UUID) and ensure `.tmp/` directory exists. All temp files use the pattern `.tmp/{SESSION_ID}_{purpose}`. Files are cleaned up at the end of the command run (see Rules). Both Claude and Codex evaluation results are persisted here — Claude agents write JSON to `.tmp/{SESSION_ID}_{idx}_claude_eval.json`, Codex results land in `.tmp/{SESSION_ID}_{idx}_codex_eval.json`.
 
 Log availability:
 
-- Both: "Multi-model: Claude + Codex v{ver} + Gemini v{ver}"
-- Codex only: "Multi-model: Claude + Codex v{ver} (Gemini unavailable)"
-- Gemini only: "Multi-model: Claude + Gemini v{ver} (Codex unavailable)"
-- Neither: "No external CLIs found. Proceeding single-model." → disable `--multi`
+- Codex available: "Multi-model: Claude + Codex v{ver}"
+- Codex unavailable: "Single-model mode (no external CLIs found)"
 
 If no argument provided:
 
@@ -98,64 +103,55 @@ If no argument provided:
 5. Load `skills/core/evaluation/references/{type}-output-criteria.md`
 6. Log: "Output evaluation: {component-name} ({type}). Output: {output-path}"
 
+## Phase 2.5: Structural Validation (Mode A/B only)
+
+> Informational gate — validates structural correctness before evaluation. Warnings do not block evaluation.
+
+Skip this phase for Mode C (Before/After) and Mode D (Output) — these modes evaluate quality differences or output behavior, where structural issues are not the focus.
+
+For Mode A (Single Static) and Mode B (Module Scan), apply the validation-methodology skill (`skills/core/validation/SKILL.md`) Steps 1-4:
+
+1. **Identify component type** from Phase 2 context (frontmatter/filename detection)
+2. **Run type-specific checks** per `skills/core/validation/references/frontmatter-and-fields.md`:
+   - Required frontmatter fields present and valid
+   - Recommended fields checked (warnings only)
+3. **Run cross-cutting checks** per `skills/core/validation/references/naming-and-collision.md`:
+   - Naming convention compliance (regex validation)
+   - Path constraints (no `../` traversal, `./` prefix)
+   - Command name collision against built-in list
+   - Inter-component reference integrity
+4. **Check common pitfalls** per `skills/core/validation/references/common-pitfalls.md`
+
+### Validation Report
+
+Produce a Validation Report per the validation-methodology SKILL (Step 4):
+
+- **PASS** (0 errors): Log "Structural validation: PASS ({m} warnings)" → proceed to Phase 3. Store report for Phase 6
+- **FAIL** (1+ errors): Log "⚠ Structural validation: FAIL ({n} errors, {m} warnings). Proceeding with evaluation." → proceed to Phase 3. Store report for Phase 6
+
+Mode B: Run validation for each component in the scan list. Aggregate results into a single report.
+
 ## Phase 3: Evaluation (Parallel when --multi)
 
 This phase runs Claude evaluation and external model evaluation. When `--multi` is active, both run in parallel for ~50% wall-clock reduction. See `skills/core/routing/references/parallel-execution-pattern.md` for the general pattern.
 
-### Step 1: Build Relay Prompt (--multi only, before fan-out)
+### Step 1: Build Relay Prompt + Init Manifest (--multi only, before fan-out)
 
 Skip if `--multi` is not active or no external CLIs are available.
 
-Construct a 4-section prompt following the Prompt Relay pattern (`skills/core/routing/references/invocation-protocol.md`).
+Construct the relay prompt using the mode-specific template from `skills/core/evaluation/references/evaluator-relay-prompts.md`. Insert dynamic content (target file, criteria reference) into the template sections. Save assembled prompt to `.tmp/{SESSION_ID}_relay.txt`.
 
-**Critical**: Sections 2-3 are verbatim file content. Claude must NOT summarize, paraphrase, or add commentary to these sections.
+**Manifest init** (resilient collection): Create a manifest declaring expected results via `scripts/parallel.sh`:
 
-#### Mode A/B: Static Evaluation Prompt
-
-**Section 1 — Role** (fixed template):
-
-```text
-You are an independent evaluator. Your task is to assess the quality of a plugin component using the criteria provided below. Score each criterion independently with detailed reasoning. Do not assume any prior context — evaluate based solely on the content and criteria given.
+```bash
+bash scripts/parallel.sh init "$SESSION_ID" '[{"idx":0,"model":"codex","file":".tmp/{SESSION_ID}_codex_eval.json"}]'
 ```
 
-**Section 2 — Content**: Raw target file content (verbatim from disk, no summarization).
-
-**Section 3 — Criteria**: Raw criteria reference content (`skills/core/evaluation/references/{type}-criteria.md`, verbatim).
-
-**Section 4 — Response Format**: Use Schema A from `skills/core/routing/references/relay-response-schemas.md`.
-
-Assemble: `{Section 1}\n\n{Section 2}\n\n{Section 3}\n\n{Section 4}`. Save to `.tmp/{SESSION_ID}_relay.txt`.
-
-#### Mode C: Comparative Evaluation Prompt
-
-**Section 1 — Role**: "You are an independent comparative evaluator..." (assess two versions, score independently, identify regressions, determine verdict).
-
-**Section 2 — Content**: Both versions verbatim, separated by `=== BEFORE VERSION ===` and `=== AFTER VERSION ===` markers.
-
-**Section 3 — Criteria**: Raw criteria reference content (`skills/core/evaluation/references/{type}-criteria.md`, verbatim).
-
-**Section 4 — Response Format**: Use Schema C from `skills/core/routing/references/relay-response-schemas.md`.
-
-Assemble and save to `.tmp/{SESSION_ID}_relay.txt`.
-
-#### Mode D: Output Evaluation Prompt
-
-**Section 1 — Role**: "You are an independent output quality evaluator..." (assess actual output using output criteria).
-
-**Section 2 — Content**: Component definition + collected output verbatim, separated by `=== COMPONENT DEFINITION ===` and `=== COLLECTED OUTPUT ===` markers.
-
-**Section 3 — Criteria**: Raw output criteria reference content (`skills/core/evaluation/references/{type}-output-criteria.md`, verbatim).
-
-**Section 4 — Response Format**: Use Schema A from `relay-response-schemas.md` (same 5-criterion flat scoring).
-
-Assemble and save to `.tmp/{SESSION_ID}_relay.txt`.
+For Mode B, include all batch entries: `[{"idx":0,...}, {"idx":1,...}, ...]` with idx-based file paths.
 
 ### Step 2: Fan-Out — Parallel Execution
 
-**Model selection** (from routing table — DR-035):
-
-- Codex: `gpt-5.3-codex` with `xhigh` reasoning effort (consistently strict on borderline criteria, 2.6× faster than gpt-5.2 xhigh, no coding-model bias on non-code evaluation)
-- Gemini: excluded until Gemini 3.1 CLI support (current models lack discrimination — factually incorrect reasoning on E1/E2)
+**Model selection**: Per `skills/core/routing/references/routing-table.md` — Codex `gpt-5.4` with `xhigh` reasoning (DR-035).
 
 #### When `--multi` is active (parallel):
 
@@ -164,31 +160,36 @@ Launch both evaluations simultaneously:
 1. **Background**: Start external model via Bash with `run_in_background: true`:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh codex gpt-5.3-codex .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
+   ${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
    ```
 
    **Timeout**: 600 seconds. Store the background task ID for later collection.
 
-2. **Foreground**: Launch Claude **evaluator** agent via Task tool (runs concurrently while Codex processes):
-   - **Input**: Component file content + component type
-   - **Instructions**: "Load `skills/core/evaluation/references/{type}-criteria.md`. Apply tiered criteria (F→Q→E) with CoT-first scoring and severity gate. Return structured evaluation report."
-   - **Expected output**: Evaluation report with criteria table, strengths, improvements
-
-For Mode B: run both evaluations per component sequentially across components (parallel within each component).
+2. **Claude evaluator**: Launch via Agent tool (subagent_type: `ouroboros:core:evaluator`).
+   - **Instructions** (all modes): "Evaluate `{component_path}` ({type}). Read the component file and load `skills/core/evaluation/references/{type}-criteria.md`. Apply tiered criteria (F→Q→E) with CoT-first scoring and severity gate. Write result as JSON to `.tmp/{SESSION_ID}_{idx}_claude_eval.json`."
+   - Agent always writes JSON to file and returns compact summary only: `"{component_path}: Level {N}, F:{a}/{b} Q:{a}/{b} E:{a}/{b} → {output_path}"`. Main context reads JSON files for Phase 6 reporting and consensus
+   - **Mode A/D**: foreground
+   - **Mode B**: `run_in_background: true`
 
 For Mode C: run both evaluations for before and after versions (4 evaluations: 2 Claude sequential + 2 Codex background).
 
-#### When `--multi` is not active (sequential, single-model):
+#### Mode B: File-Based Parallel Execution
 
-Launch the **evaluator** agent via Task tool only:
+Launch all evaluations as background tasks with file-based result collection. This protects the main context window from 10+ component evaluation outputs.
 
-- **Input**: Component file content + component type
-- **Instructions**: "Load `skills/core/evaluation/references/{type}-criteria.md`. Apply tiered criteria (F→Q→E) with CoT-first scoring and severity gate. Return structured evaluation report."
-- **Expected output**: Evaluation report with criteria table, strengths, improvements
+- **Codex**: All relay prompts built upfront → background Bash in waves of 6 → results in `.tmp/{SESSION_ID}_{idx}_codex_eval.json`
+- **Claude**: All evaluator agents launched as background Agent with `run_in_background: true` → results in `.tmp/{SESSION_ID}_{idx}_claude_eval.json`
+- **Main context**: only handles launch, collection, consensus, and reporting
 
-For Mode B: launch evaluator for each component (sequential — one at a time for reasoning quality).
+Temp files use component index: `.tmp/{SESSION_ID}_{idx}_relay.txt`, `.tmp/{SESSION_ID}_{idx}_codex_eval.json`, `.tmp/{SESSION_ID}_{idx}_claude_eval.json`. All evaluations are read-only — no shared state between components.
 
-For Mode C: launch evaluator twice (before version, then after version).
+Apply circuit breaker per `skills/core/routing/references/invocation-protocol.md` — 2 consecutive failures per model triggers skip for remainder.
+
+When `--sequential` is set: fall back to one-at-a-time foreground processing. Results are stored and reported in Phase 2 discovery order regardless of completion order.
+
+#### When `--multi` is not active (single-model):
+
+Launch Claude evaluator only — same instructions as above (always writes JSON to `.tmp/{SESSION_ID}_{idx}_claude_eval.json`). Mode A: foreground agent. Mode B: background agents. Mode C: foreground, twice (before then after). All modes produce file output.
 
 #### Evaluator Recovery (all modes, single-model and multi-model Claude path)
 
@@ -200,9 +201,17 @@ If the evaluator agent fails (timeout, error, or unparseable output):
 | Malformed report (missing criteria table, partial output) | Extract partial scores from available output — look for criterion IDs, score patterns, reasoning sections. Report partial result: "Partial evaluation ({n}/{total} criteria recovered)." |
 | Mode B component failure | Skip failed component, continue remaining. Note in summary: "{component}: evaluation failed — excluded from module average." |
 
-### Step 3: Fan-In — Collect Results (--multi only)
+### Step 3: Fan-In — Collect Results
 
-After Claude evaluator completes (foreground), collect the background Codex result.
+After all background tasks complete (notified automatically), collect results from files.
+
+**Resilient collection**: Verify all results arrived via `scripts/parallel.sh`:
+
+```bash
+bash scripts/parallel.sh collect "$SESSION_ID"
+```
+
+If exit 0 (all present), proceed normally. If exit 1 (gaps), check gap report and fall through to per-model exit code handling below.
 
 Check the background task output. Handle by exit code:
 
@@ -213,27 +222,11 @@ Check the background task output. Handle by exit code:
 | 2 | CLI error | Skip model, log error from stderr |
 | 124 | Timeout | Skip model, log: "{model}: timed out after 600s. Skipping." |
 
-**LLM fallback** (exit code 1):
-
-1. Read the raw output file via Read tool
-2. Identify the model's response section (skip metadata, logs, error traces)
-3. Extract evaluation scores — look for `"C1"`, `"score"`, `"reasoning"` patterns, even in prose
-4. Construct a partial result with whatever is recoverable
-5. Log: "{model}: partial result ({n} criteria recovered via LLM fallback)"
-
-Partial scores are valid in consensus — missing criteria are marked `"-"` in the report.
-
-For parsing details, see `skills/core/routing/references/parsing-strategy.md`.
+**LLM fallback** (exit code 1): Apply the LLM extraction strategy from `skills/core/routing/references/parsing-strategy.md` — read raw output, extract score patterns, construct partial result. Partial scores are valid in consensus; missing criteria are marked `"-"` in the report.
 
 ### Step 4: Circuit Breaker (Mode B)
 
-If a CLI fails (parse error, timeout, non-zero exit, empty response):
-
-- Increment `failure_count[model]`
-- If `failure_count[model] >= 2`: skip all remaining invocations for that model in this run
-- Log: "{model} CLI failed {n} times (v{version}). Skipping for remainder."
-
-For Mode B: apply circuit breaker across components within the parallel execution loop.
+Apply circuit breaker per `skills/core/routing/references/invocation-protocol.md` — 2 consecutive failures per CLI triggers skip for the remainder of this command run. In batch parallel mode, check at batch boundaries (after fan-in, before launching next batch).
 
 ## Phase 4: Pairwise Comparison (Mode C only)
 
@@ -268,7 +261,40 @@ With `--unanimous`: apply convergence prompts per consensus-protocol.md Unanimou
 
 Calculate and store: `agreement_rate`, `consensus_scores`, `consensus_total`, `bias_flags`, `divergent_criteria`. For Mode C additionally: `verdict_consensus`, `verdict_agreement`, `regression_consensus`.
 
+Record model details in `multi_model.models` as structured objects:
+
+```json
+"models": [
+  {"name": "claude", "model_id": "<current-claude-model>"},
+  {"name": "codex", "model_id": "gpt-5.4", "effort": "xhigh"}
+]
+```
+
+Use the actual Claude model ID (e.g., `claude-opus-4-6`) and the Codex model/effort from the invoke-model.sh call above.
+
 ## Phase 6: Report
+
+### Structural Validation Section (Mode A/B, conditional)
+
+When Phase 2.5 ran and produced results, prepend to the mode report:
+
+```markdown
+### Structural Validation
+
+**Result**: {PASS|FAIL} ({n} errors, {m} warnings)
+
+{If FAIL — error table:}
+| # | Check | Expected | Actual | Fix |
+|---|-------|----------|--------|-----|
+| 1 | {check name} | {expected} | {actual} | {fix instruction} |
+
+{If warnings — warning table:}
+| # | Check | Issue | Recommendation |
+|---|-------|-------|----------------|
+| 1 | {check name} | {issue} | {suggestion} |
+```
+
+Omit this section entirely when Phase 2.5 was skipped (Mode C/D) or when validation passed with 0 warnings.
 
 ### Single-Model Reports (default, no --multi)
 
@@ -278,7 +304,10 @@ Present evaluator's report directly. Highlight:
 
 - Overall Level and Score
 - Specific improvement directions for 0-score criteria
-- "Run `/evaluate` again after improvements to verify changes."
+- Context-aware next actions:
+  - If Level < 4 with 0-score criteria: "`/evolve {target_path} --focus {lowest_criterion_id}` — improve the weakest area"
+  - If Level = 4: "`/evaluate --output <output-path> {target_path}` — verify output quality matches definition"
+  - Always: "`/evaluate {target_path} --multi` — cross-validate with external model"
 
 #### Mode B: Module Scan
 
@@ -293,7 +322,10 @@ Aggregate all component reports into summary:
 
 **Module Average**: {avg}/5 (Level {avg_level})
 **Weakest Component**: {name} — {reason}
-**Recommendation**: {module-level improvement suggestion}
+
+### Next Actions
+- `/evolve {weakest_component_path}` — improve the weakest component
+- `/evaluate {module} --multi --compare` — track improvement over baseline
 ```
 
 #### Mode C: Before/After
@@ -303,7 +335,10 @@ Present both evaluations + pairwise verdict:
 - Side-by-side score comparison
 - Regression warnings (if any criteria dropped)
 - Verdict: improved / degraded / lateral
-- "Use this result for `/evolve` validation."
+- Context-aware next actions:
+  - If improved: "`/evaluate {after_path} --save` — persist the improvement"
+  - If degraded: "Review regressions above. `/evolve {after_path} --focus {regressed_criteria}` — fix regressions"
+  - If lateral: "No change detected. Consider `/evolve {after_path}` with different focus areas"
 
 #### Mode D: Output
 
@@ -323,7 +358,10 @@ If the component has a recent static evaluation (from `--save` or `dev/evaluatio
 
 **Gap Analysis**: If static >> dynamic, the definition promises more than it delivers — focus on improving execution. If dynamic >> static, the component works well despite a rough definition — clean up the definition. Suggest: "Improve the lower axis first."
 
-- "Run `/evaluate --output <output-path> {path}` after changes to track improvement."
+- Context-aware next actions:
+  - If static >> dynamic: "`/evolve {target_path}` — improve execution quality to match the strong definition"
+  - If dynamic >> static: "`/evolve {target_path} --focus F` — clean up the definition to match the good output"
+  - Always: "`/evaluate --output <new-output-path> {target_path}` — re-evaluate after changes"
 
 ### Multi-Model Reports (--multi active)
 
@@ -352,15 +390,22 @@ For each evaluated component, extract from the evaluator's markdown report:
 
 Claude Code parses the evaluator's markdown output directly — no evaluator agent changes needed.
 
-### Step 2: Collect Content Hashes
+### Step 2: Collect Hashes
 
-For each component, run:
+For each component, compute two hashes:
 
 ```bash
+# Content hash — tracks file changes only
 ${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh hash <component-path>
+
+# Eval hash — tracks file + all judge models used
+# Single model:
+${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh eval-hash <component-path> claude-opus-4-6
+# Multi model:
+${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh eval-hash <component-path> claude-opus-4-6 gpt-5.4:xhigh
 ```
 
-Store the returned `sha256:{hex}` as `content_hash`.
+Store the returned values as `content_hash` and `eval_hash` respectively. Model specs are sorted internally, so argument order does not matter.
 
 ### Step 3: Build JSON Result
 
@@ -437,14 +482,8 @@ Highlight:
 - If module scan finds 10+ components, suggest narrowing scope to user
 - Before/After with mismatched types is an error (incomparable)
 - Output mode requires `--output <output-path>` — no test set fallback
-- **Multi-model is additive** — Claude evaluation always runs regardless of external model availability
-- **Parallel execution** — when `--multi` is active, Codex runs in background (Bash `run_in_background`) while Claude evaluator runs in foreground (Task). Relay prompt is built from Phase 2 output only — no dependency on Claude's result. See `skills/core/routing/references/parallel-execution-pattern.md`
 - **Prompt Relay integrity** — Sections 2-3 of the relay prompt must be verbatim file content, never summarized or annotated by Claude
-- **Circuit breaker** — 2 consecutive failures per CLI → skip that model for the rest of the command run. For single-invocation modes (A, C, D), each model gets one chance; circuit breaker primarily applies in Mode B (multiple components)
 - **Self-enhancement bias flags are advisory** — they do not change scores, only alert the user
-- **Settings requirement** — `--multi` requires `Bash(codex *)` and/or `Bash(gemini *)` patterns in `settings.json` allow list
-- **Temp file lifecycle** — all temp files go to `.tmp/{SESSION_ID}_*` within the workspace (not `/tmp`). Clean up at command end: `bash scripts/session.sh cleanup {SESSION_ID}`. The `.tmp/` directory itself persists (gitignored)
-- **`--save` result format** — JSON schema defined in `skills/core/evaluation/references/regression-format.md`. One file per run
-- **`--compare` implies `--save`** — comparison always produces a new saved result alongside the regression report
+- **Settings requirement** — `--multi` requires `Bash(codex *)` pattern in `settings.json` allow list
 - **Evaluator variance** — content_hash unchanged + score changed = evaluator inconsistency, not regression. Label accordingly
 - **`--save`/`--compare` compatibility** — works with Mode A (single) and Mode B (module scan). Mode C with `--save` saves the evaluation but comparison is not yet supported. Mode D with `--save` includes the `output_evaluation` field in the persisted JSON

@@ -1,9 +1,10 @@
 {
-  "description": "Ouroboros plugin hooks — URL security validation and code formatting",
+  "description": "Ouroboros plugin hooks — URL security, code formatting, session lifecycle, output capture, choice logging, and message collection",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "WebFetch",
+        "description": "Block dangerous URLs before fetch: non-HTTPS protocols, internal/private IPs, direct IP access",
         "hooks": [
           {
             "type": "command",
@@ -16,11 +17,79 @@
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
+        "description": "Auto-format written files by extension: ruff (py), prettier/eslint (ts), rustfmt (rs), trailing whitespace (md), shfmt/shellcheck (sh)",
         "hooks": [
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/format.sh",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "description": "Inject dev/STATUS.md, recent git activity, and restored conversation context into session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "description": "Produce compact change summary (recent commits, diff stats, session name suggestion) for compaction context",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre-compact.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "description": "Append user message to ~/.claude/user-messages.jsonl for batch friction analysis (append-only telemetry)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/user-message-log.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "description": "Append permission choice to ~/.claude/choice-log.jsonl for permission pattern analysis (append-only telemetry)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/choice-log.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "ouroboros:",
+        "description": "Capture ouroboros agent output to .captures/ for evaluation pipeline (opt-in via OUROBOROS_CAPTURE=1)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/capture-output.sh",
+            "timeout": 10,
+            "async": true
           }
         ]
       }

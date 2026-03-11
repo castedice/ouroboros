@@ -8,16 +8,16 @@ Base report structure for multi-model evaluation results. Mode-specific sections
 ## Multi-Model Evaluation: {component name}
 
 **Type**: {type}
-**Models**: Claude {model} + Codex {codex_model} [+ Gemini {gemini_model}]
+**Models**: Claude {model} + Codex {codex_model}
 **Mode**: Consensus ({majority|unanimous})
 **Agreement Rate**: {n}/{total} ({percentage}%)
 **Consensus Score**: {consensus_score}
 
 ### Per-Criterion Consensus
 
-| # | Criterion | Claude | Codex | Gemini | Consensus | Agreement |
-|---|-----------|--------|-------|--------|-----------|-----------|
-| C1 | {name} | {0|1} | {0|1} | {0|1|-} | {0|1} | {unanimous|majority|split} |
+| # | Criterion | Claude | Codex | Consensus | Agreement |
+|---|-----------|--------|-------|-----------|-----------|
+| C1 | {name} | {0|1} | {0|1} | {0|1} | {unanimous|majority|split} |
 | ... | ... | ... | ... | ... | ... | ... |
 
 ### Divergence Analysis
@@ -31,10 +31,6 @@ Base report structure for multi-model evaluation results. Mode-specific sections
 
 **Codex (score: {s})**:
 > {Codex's reasoning excerpt}
-
-{If Gemini available:}
-**Gemini (score: {s})**:
-> {Gemini's reasoning excerpt}
 
 **Resolution**: {majority rule|unanimous after {n} rounds|user decision} → score {0|1}
 {If bias detected: "⚠ Potential self-enhancement bias — Claude scored higher than all external models"}
@@ -55,7 +51,6 @@ Base report structure for multi-model evaluation results. Mode-specific sections
 |-------|---------------------------|
 | Claude | evaluator agent, evaluation-methodology skill |
 | Codex | {context_used from response} |
-| Gemini | {context_used from response} |
 ```
 
 ## Mode-Specific Additions
@@ -87,7 +82,6 @@ Prepend a Verdict Consensus table before the Per-Criterion Consensus section:
 |-------|-------------|-------------|---------|
 | Claude | {n}/{max} | {n}/{max} | {improved|degraded|lateral} |
 | Codex | {n}/{max} | {n}/{max} | {improved|degraded|lateral} |
-| Gemini | {n}/{max} | {n}/{max} | {improved|degraded|lateral} |
 | **Consensus** | **{n}/{max}** | **{n}/{max}** | **{verdict}** |
 ```
 
@@ -106,7 +100,6 @@ Append a Regression Analysis section after Divergence Analysis:
 |-------|-------------------|-----------|
 | Claude | {yes|no} | {reasoning excerpt} |
 | Codex | {yes|no} | {reasoning excerpt} |
-| Gemini | {yes|no} | {reasoning excerpt} |
 
 **Consensus**: {confirmed regression|disputed — majority says no regression}
 ```

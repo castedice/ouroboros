@@ -125,8 +125,8 @@ Hooks have the most constrained validation because they execute automatically wi
 
 | Field | Valid Values | Common Mistake |
 |---|---|---|
-| `event` | `PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit` | Misspelled event name (silent failure) |
-| `matcher` | Exact tool name or OR pattern (`Write\|Edit`) | Wildcard `*` matching all tools (performance) |
+| `event` | Any of 17 supported events (see [frontmatter-and-fields.md](./references/frontmatter-and-fields.md) for full list) | Misspelled event name (silent failure) |
+| `matcher` | Exact tool name or OR pattern (`Write\|Edit`) — some events use regex | Wildcard `*` matching all tools (performance) |
 | `timeout` | 10-60s (typical), always required | Omitted timeout (risk of infinite hang) |
 | `command` | Script path with `${CLAUDE_PLUGIN_ROOT}` | Hardcoded absolute path |
 
@@ -199,6 +199,9 @@ Use this checklist to verify structural correctness of any plugin component:
 
 ## See Also
 
+- **evaluator agent** (`agents/core/evaluator.md`) — Runs structural validation checks before evaluation scoring
+- **evaluate command** (`commands/core/evaluate.md`) — Phase 2.5 Structural Validation; invokes this skill's workflow as a pre-evaluation gate
+- **generate command** (`commands/core/generate.md`) — Phase 5.5 structural validation; validates generated components before finalization
 - **evaluation-methodology** (`skills/core/evaluation/SKILL.md`) — Quality scoring that follows validation; evaluation assumes structural correctness
-- **plugin-component-quality-patterns** (`docs/knowledge/plugin-component-quality-patterns.md`) — HIGH vs LOW quality patterns per component type
-- **compound-engineering-plugin-patterns** (`docs/knowledge/compound-engineering-plugin-patterns.md`) — Namespace collision avoidance pattern
+- **plugin-component-quality-patterns** (`docs/specs/knowledge/plugin-component-quality-patterns.md`) — HIGH vs LOW quality patterns per component type
+- **compound-engineering-plugin-patterns** (`docs/specs/knowledge/compound-engineering-plugin-patterns.md`) — Namespace collision avoidance pattern

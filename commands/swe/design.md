@@ -1,6 +1,6 @@
 ---
 description: "Stage 3 — Architecture decisions, algorithm and data structure selection, bounded by constraints (DDD)"
-argument-hint: "<task-description> [--depth Skip|Light|Standard|Deep] [--artifact <constraint-profile-path>]"
+argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <constraint-profile-path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
 
@@ -35,32 +35,32 @@ Validate `--depth` if provided. If invalid: error and abort.
 
 ## Phase 2: Depth Decision
 
-If `--depth` was provided, use directly. Log: "Depth override: {depth}."
+### Execution Path
 
-Otherwise, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md`:
+| Condition | Path |
+|-----------|------|
+| `--fast` + task fits existing pattern | Skip → minimal artifact → Phase 6 |
+| `--fast` + structural decisions needed | Light |
+| `--depth Skip` + no new components/modules | Skip → minimal artifact → Phase 6 |
+| `--depth Skip` + structural changes required | Override to Light |
+| `--depth` provided (Light/Standard/Deep) | Use directly |
+| No flags | Score via `depth-system.md` |
 
-1. Score 5 factors, sum (5-15), map to depth
-2. Check stage-specific minimum depth triggers:
-   - Deep when architecture or data model changes across bounded contexts
-3. Check escalation rules (P95 < 200ms at 1000+ RPS escalates Design)
+### Depth Scoring
+
+If no `--depth` override, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md` (score 5 factors → sum → map to depth level). Stage-specific triggers:
+
+- Deep when architecture or data model changes across bounded contexts
+- Escalation: P95 < 200ms at 1000+ RPS
 
 Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
-
-### Skip Handling
-
-If depth is **Skip**: Verify — "Implementation within existing architecture, no structural decisions" per `depth-system.md`. If task involves new components, modules, or significant data model changes:
-
-- Log: "Skip not applicable — task requires structural decisions. Defaulting to Light."
-- Set depth to Light
-
-Otherwise: produce minimal skip artifact noting "No architecture changes — implementation within existing structure" and jump to Phase 6.
 
 ## Phase 3: Context Gathering
 
 1. **Upstream artifact**: If `--artifact` is provided, read the Constraint Profile
    - Extract Hard constraints, Soft constraints, conflict resolutions
    - If artifact is missing: warn "Constraint Profile not found at {path}. Design without constraints risks over/under-engineering. Consider running `/swe constrain` first."
-2. **Context Document**: Read `.swe/active/01-understand.md` if it exists. Extract domain model and affected components
+2. **Context Document**: Read `.swe/active/01-understand.md` if it exists. At Light depth, read summary only (`Read(file, limit: 15)`) per the Selective Load Matrix in `artifact-contracts.md`. At Standard+ depth, read in full. Extract domain model and affected components
 3. **Codebase architecture**: Survey existing architecture patterns:
    - Module/package structure and dependency relationships
    - Existing architectural patterns (layered, hexagonal, event-driven, etc.)
@@ -77,8 +77,8 @@ If no Constraint Profile available (no `--artifact`, no matching file):
 
 Delegate architecture design to the analyst agent via Task tool:
 
-- **Input**: Task description + Constraint Profile content (if available) + Context Document content (if available) + codebase architecture signals + depth level
-- **Instructions**: "Execute Procedure 3 (Design) at {depth} depth. Follow the template at `templates/swe/architecture-spec.md` — include sections matching the depth markers for this depth level. Consider 2-3 alternatives (minimum 2 for Standard/Deep). Evaluate against the Constraint Profile. Design top-down: System > Component > Code. At Deep depth, use the 3-field ADR format (Context/Decision/Consequences). Ensure every design decision traces to at least one constraint in the Traceability Matrix. Return the artifact content as structured markdown."
+- **Input**: Task description + Constraint Profile content (if available) + Context Document content (if available) + codebase architecture signals + depth level + Project Context (if `docs/specs/project/architecture.md` exists, include its `## Summary` section)
+- **Instructions**: "Start your output with a `## Summary` section (3-5 sentences capturing the chosen architectural pattern, key decisions, and constraint traceability), then continue with full content. Execute Procedure 3 (Design) at {depth} depth. Follow the template at `templates/swe/architecture-spec.md` — include sections matching the depth markers for this depth level. Consider 2-3 alternatives (minimum 2 for Standard/Deep). Evaluate against the Constraint Profile. Design top-down: System > Component > Code. At Deep depth, use the 3-field ADR format (Context/Decision/Consequences). Ensure every design decision traces to at least one constraint in the Traceability Matrix. Return the artifact content as structured markdown."
 - **Expected output**: Architecture Spec content (structured markdown)
 
 ### Recovery
@@ -160,6 +160,8 @@ Run Stage 4 (Interface) to define contracts between the designed components:
 - `/swe constrain "{task}"` — revisit Stage 2 if design reveals new constraints
 - `/swe spec "{task}"` — run all 4 specification stages
 - `/swe understand "{task}"` — revisit Stage 1 if design reveals domain gaps
+- **Analyst agent** (`agents/swe/analyst.md`) — executes architecture design
+- **SWE Methodology** (`skills/swe/methodology/SKILL.md`) — pipeline methodology reference
 ```
 
 ## Rules
@@ -167,7 +169,5 @@ Run Stage 4 (Interface) to define contracts between the designed components:
 - Analyst agent is read-only — only the command writes artifacts
 - Architecture Spec is the input contract for Stage 4 (Interface) — see `skills/swe/methodology/references/artifact-contracts.md`
 - **Never write code at the Design stage** — resist the urge to prototype. Design produces decisions, not implementation
-- At Standard/Deep depth, require minimum 2 architectural alternatives with trade-off analysis
 - Constraint traceability is mandatory when a Constraint Profile exists — orphan design decisions (no constraint reference) must be flagged
-- Backward transition: if design reveals constraint gaps, recommend returning to Stage 2 (Constrain)
 - When invoked by `/swe spec`, skip user checkpoint (Phase 5 review) and proceed directly to Phase 6

@@ -1,7 +1,7 @@
 ---
 description: Explore ouroboros capabilities — discover installed modules, list available commands, and recommend workflows
 argument-hint: [<topic>]
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Task
 ---
 
 # Onboard — Capability Explorer
@@ -12,7 +12,9 @@ Target: $ARGUMENTS
 
 ## Agents Used
 
-None. This command uses only Glob and Read for lightweight discovery.
+| Phase | Agent | Role |
+|-------|-------|------|
+| 3 | researcher | Workflow recommendation — context-aware suggestions based on discovery registry |
 
 ## Phase 1: Parse Input
 
@@ -53,13 +55,13 @@ Expected frontmatter fields are defined in `skills/core/validation/references/fr
 
 For each discovered command file:
 
-1. Read the file (first 10 lines sufficient for frontmatter)
-2. Extract `description` and `argument-hint` from YAML frontmatter
+1. Read the file frontmatter per `skills/core/validation/references/frontmatter-and-fields.md`
+2. Extract `description` and `argument-hint`
 
 For each discovered agent file:
 
-1. Read the file (first 5 lines sufficient)
-2. Extract `name` from YAML frontmatter
+1. Read the file frontmatter
+2. Extract `name`
 
 ### 2c: Build Registry
 
@@ -73,7 +75,26 @@ Module: {module-name}
   Templates: [{name}, ...]
 ```
 
-## Phase 3: Present
+## Phase 3: Workflow Analysis (Overview mode only)
+
+> Agent: **researcher**
+
+Skip this phase in Detail mode — proceed directly to Phase 4.
+
+Delegate workflow recommendation to the researcher agent via Task tool:
+
+- **Input**: Discovery registry from Phase 2 (module list, command counts, agent/skill/template counts per module)
+- **Instructions**: "Analyze the installed ouroboros capabilities using synthesis methodology per `skills/core/research/references/synthesis-patterns.md`. Based on the module composition and component distribution, produce: (1) Recommended starter workflows ranked by value, (2) Context-aware next steps identifying the most complex command, the smallest component for a quick evaluation win, and any module gaps. Use frontmatter field definitions from `skills/core/validation/references/frontmatter-and-fields.md` when interpreting component metadata. Keep recommendations concise — 3-5 workflow suggestions."
+- **Expected output**: Workflow recommendations with rationale
+
+### Recovery
+
+| Failure | Action |
+|---------|--------|
+| Agent timeout/error | Fall back to static workflow suggestions (Getting Started, Self-Improvement Cycle, Knowledge Building). Log: "Workflow analysis unavailable — showing standard recommendations." |
+| Incomplete output | Use available suggestions, supplement with static fallbacks for missing categories |
+
+## Phase 4: Present
 
 ### Overview Mode (no topic)
 
@@ -101,46 +122,18 @@ Module: {module-name}
 
 ### Recommended Workflows
 
-#### Getting Started
-1. `/onboard <command>` — learn about a specific command
-2. `/evaluate <component>` — assess a component's quality
-3. `/evolve <component>` — improve based on evaluation
+{Insert researcher's workflow recommendations from Phase 3. If Phase 3 fell back to static suggestions, use these defaults:}
 
-#### Self-Improvement Cycle
-1. `/evaluate` → identify weakest component (criteria: `skills/core/evaluation/references/command-criteria.md`)
-2. `/evolve` → improve it with researcher + evaluator guidance
-3. `/evaluate` → verify improvement (before/after comparison)
-
-#### Knowledge Building
-1. `/research <source>` → analyze external patterns
-2. `/absorb <source> --into <module>` → integrate into the monolith
-3. `/evolve <component>` → apply absorbed knowledge
-
-#### Multi-Model Evaluation
-1. Install external CLIs: `npm install -g @openai/codex @google/gemini-cli`
-2. Add Bash permissions to `.claude/settings.json`: `"Bash(codex *)"`, `"Bash(gemini *)"`, etc.
-3. `/evaluate <component> --multi` → Claude + Codex + Gemini consensus scoring (routing: `skills/core/routing/SKILL.md`)
-4. `/evaluate <component> --multi --unanimous` → require all models to agree
-
-#### Staying Current
-1. `/upgrade --check` → preview upstream changes
-2. `/upgrade` → apply upstream updates safely
-3. `/evaluate` → verify nothing regressed
-
-#### Project Integration
-1. `/adopt <project-path>` → generate AGENTS.md for a project
-2. `/onboard` → explore what's available
-
-### Quick Reference
-
-- **Primitives**: `/evaluate`, `/evolve`, `/research`, `/generate`
-- **Composites**: `/absorb`, `/upgrade`, `/adopt`, `/onboard`
-- **Multi-model**: `/evaluate --multi` (requires Codex CLI + Gemini CLI)
-- **Philosophy**: Co-Evolutionary Self-Improvement — every cycle makes the next one better
+- **Getting Started**: `/onboard <command>` → `/evaluate <component>` → `/evolve <component>`
+- **Self-Improvement Cycle**: `/evaluate` (identify weakest) → `/evolve` (improve) → `/evaluate` (verify)
+- **Knowledge Building**: `/research <source>` → `/absorb` → `/evolve`
+- **Multi-Model Evaluation**: Install external CLIs → `/evaluate --multi` (routing: `skills/core/routing/SKILL.md`)
+- **Staying Current**: `/upgrade --check` → `/upgrade` → `/evaluate`
+- **Project Integration**: `/adopt <project-path>` → `/onboard`
 
 ### Next Steps
 
-{Generate context-aware suggestions from the discovery results:}
+{Insert researcher's context-aware suggestions from Phase 3, or generate from discovery results:}
 
 - **Deep dive**: `/onboard {command-with-most-agents}` — the most complex command, worth exploring first
 - **Quality check**: `/evaluate commands/{module}/{command-with-fewest-components}.md` — smallest component, quick win for evaluation
@@ -169,13 +162,6 @@ Read the full command file and present structured details:
 | 1 | {phase-name} | {agent or —} | {brief description} |
 | ... | ... | ... | ... |
 
-### Agents Used
-
-| Agent | Role |
-|-------|------|
-| {agent-name} | {role description} |
-| ... | ... |
-
 ### Usage Examples
 
 {Derive from argument-hint and command structure:}
@@ -187,21 +173,19 @@ Read the full command file and present structured details:
 {Scan other commands in the same module and suggest related workflows:}
 - `/{related-command}` — {how it connects to this command}
 
-### Rules
+### Rules & Next Steps
 
 {Extract key rules from the command's Rules section, if present}
 
-### Next Steps
-
-- `/evaluate commands/{module}/{command-name}.md` — assess this command's quality against criteria
-- `/evolve commands/{module}/{command-name}.md --focus {weakest-section}` — improve the area with least detail
-- `/onboard {related-command}` — explore the most closely related command
+- `/evaluate commands/{module}/{command-name}.md` — assess quality
+- `/evolve commands/{module}/{command-name}.md` — improve weakest area
+- `/onboard {related-command}` — explore related command
 ```
 
 ## Rules
 
 - **Pure read-only**: This command never writes, creates, or modifies any files
-- **No agents**: Module discovery and frontmatter parsing are simple operations — agent delegation would be over-engineering
+- **Minimal agent use**: Only the researcher agent (Phase 3, Overview mode) for context-aware workflow recommendations. Discovery and parsing remain agent-free
 - **No network**: All information comes from local file scanning
 - **Graceful degradation**: If a module has no commands (empty directory), still list it with count 0
 - **Frontmatter parsing**: Only read YAML frontmatter fields — do not parse or execute command body content
@@ -209,6 +193,9 @@ Read the full command file and present structured details:
 
 ### Recovery
 
-- **Missing plugin structure**: If `commands/` directory does not exist or is empty, output a diagnostic message listing the expected structure (`commands/`, `agents/`, `skills/`, `templates/`) and suggest verifying the plugin installation path
-- **Frontmatter parse failure**: If a specific file's frontmatter cannot be parsed (malformed YAML, missing fields), skip that file, continue with remaining files, and append a "Partial results" note listing the skipped files at the end of the output
-- **Inaccessible files**: If a file cannot be read (permissions, broken symlink), skip it and include it in the partial results note alongside frontmatter failures
+| Failure | Action |
+|---------|--------|
+| Missing plugin structure (`commands/` absent/empty) | Output diagnostic listing expected structure (`commands/`, `agents/`, `skills/`, `templates/`). Suggest: "Verify plugin installation path. Run `claude --plugin-dir <path>` to check." |
+| Frontmatter parse failure | Skip file, continue remaining. Retry file once with Read(limit: 20). If still fails: append "Partial results" note listing skipped files |
+| Inaccessible files (permissions, broken symlink) | Skip and include in partial results note |
+| Detail mode: command not found | Suggest closest matches via Grep on available command names. If no close match: fall back to Overview mode |

@@ -202,35 +202,24 @@ When findings conflict:
 1. **Performance vs Readability**: If the Constraint Profile has Hard performance constraints, performance wins. Otherwise, readability wins — premature optimization is a readability tax
 2. **Architecture vs Pragmatism**: If a deviation is documented in the Verification Report as an Intentional Deviation, acknowledge it and downgrade to P3
 
-## Calibration: Good vs Bad Findings
+## Calibration
 
-### Bad Finding
+See detailed Good/Bad examples at `skills/swe/methodology/references/calibration-examples.md` — Reviewer section.
 
-```text
-### PERF-1: Performance concern
+**Key calibration principles**:
+- Bad: no evidence, vague location, unjustified severity, unactionable suggestion
+- Good: specific location with line numbers, evidence-based analysis, constraint-referenced impact, concrete fix
 
-**Severity**: P1
-**Location**: src/search.rs
-**Finding**: This function might be slow
-**Suggestion**: Consider optimizing it
-```
+## Cross-Component Integration
 
-**Why bad**: No evidence ("might be slow" — based on what?). No specific line number. No impact assessment. P1 severity without justification. Suggestion is vague ("consider optimizing" — how?). No constraint reference. This finding is unactionable noise.
+The reviewer agent operates within the SWE pipeline ecosystem:
 
-### Good Finding
-
-```text
-### PERF-1: O(n*m) nested iteration in search ranking
-
-**Severity**: P2
-**Perspective**: Performance
-**Location**: src/search/ranking.rs:42-58
-**Finding**: The `rank_results` function iterates over all documents (outer loop) and for each document iterates over all query terms (inner loop), producing O(n*m) complexity where n=documents, m=terms. With the expected corpus size of 10K documents and average 5 terms per query, this processes 50K iterations per search.
-**Impact**: At Standard depth Constraint Profile target of p95 < 200ms, this approach is marginal. At 100K documents it will exceed the target.
-**Suggestion**: Pre-compute a term-to-document inverted index during indexing. This converts search from O(n*m) to O(m*k) where k is average documents per term (typically << n). Change `rank_results` to look up the inverted index instead of scanning all documents.
-```
-
-**Why good**: Specific location with line numbers. Evidence-based complexity analysis with concrete numbers. Impact assessment tied to Constraint Profile targets. Severity calibrated correctly (P2, not P1 — currently marginal, not broken). Concrete fix suggestion with expected improvement.
+- **Invoked by**: `/swe ship` (composite) — Security Review and Code Review stages
+- **Consumes artifacts from**: analyst agent (Architecture Spec, Constraint Profile), implementer agent (source code, test results)
+- **Produces findings for**: implementer agent (P1/P2 fixes), `/swe tune` retrospect (review findings)
+- **References**: `skills/swe/methodology/SKILL.md` (pipeline methodology), `skills/swe/persuasion/SKILL.md` (structured argumentation for review findings)
+- **Instruction templates**: `skills/swe/methodology/references/agent-instructions.md` — Security Review, Code Review
+- **Artifact contracts**: `skills/swe/methodology/references/artifact-contracts.md` — Ship Report format
 
 ## Scope Boundary
 
