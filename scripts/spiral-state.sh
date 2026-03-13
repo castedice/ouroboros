@@ -107,7 +107,7 @@ _maybe_launch_monitor() {
 
   # Skip if monitor is already running in another pane
   local monitor_panes
-  monitor_panes=$(tmux list-panes -F '#{pane_pid}' | while read -r pid; do
+  monitor_panes=$(tmux list-panes -t "${TMUX_PANE}" -F '#{pane_pid}' 2>/dev/null | while read -r pid; do
     ps -o args= -p "$pid" 2>/dev/null | grep -q "spiral-monitor" && echo "$pid"
   done)
   [[ -n "$monitor_panes" ]] && return
@@ -115,8 +115,8 @@ _maybe_launch_monitor() {
   local monitor_script="${SCRIPT_DIR}/spiral-monitor.sh"
   [[ ! -x "$monitor_script" ]] && return
 
-  # Launch in a right-side pane (40% width)
-  tmux split-window -h -l '40%' -d "cd $(pwd) && $monitor_script"
+  # Launch in a right-side pane (40% width), targeting the pane where this script runs
+  tmux split-window -h -l '40%' -d -t "${TMUX_PANE}" "cd $(pwd) && $monitor_script"
   echo "Monitor: launched in tmux pane (OUROBOROS_NO_MONITOR=1 to disable)"
 }
 

@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pr
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-03-13
+
+Codex MCP → exec migration, spiral quality improvements, and public release documentation.
+
+### Added
+
+- Codex `exec resume` multi-turn pattern in invocation protocol (thread_id-based session continuity)
+- Codex skills symlink setup: 12 ouroboros skills shared with Codex via `~/.codex/skills/` symlinks (format-compatible SKILL.md + references/)
+- Public-facing documentation: `docs/ROADMAP.md` (development journey), refined `docs/designs/v0.15.0-spiral-analysis.md`, 3 experiment reports (`docs/experiments/` — self-eval bias, model optimization, unanimous convergence)
+- Coding Style section in AGENTS.md with writing conventions for contributors
+
+### Changed
+
+- Bridge Agent: MCP-based delegation → `codex exec` + `exec resume` for multi-turn stage execution
+- Team execution pattern: MCP availability check → Codex CLI availability check (`which codex`)
+- Spiral command: extracted 3 shared team patterns (Team Composite Delegation, Team Auto-Gate, Cross-Review Resolution), `--policy` default `probe` → `linear`, 608→554 lines (E1/E2 improvement)
+- `methodology/SKILL.md`: added Bias column to Pitfalls table (7 cognitive biases)
+- Invocation protocol: CLI version baseline updated (v0.104.0 → v0.114.0)
+- `prepare-release.sh`: curated `docs/` content inclusion (ROADMAP, designs, experiments), knowledge directory excluded from release
+- CLAUDE.md and AGENTS.md: translated Korean content to English for public release
+- README.md: fixed default policy description (probe → linear)
+- `plugin.json` version: 1.0.0 → 1.0.1
+
+### Removed
+
+- `.mcp.json` (Codex MCP server configuration) — replaced by direct exec invocation
+- `docs/specs/knowledge/` from release package (project-specific, not plugin content)
+
 ## [1.0.0] — 2026-03-11
 
 Public release.

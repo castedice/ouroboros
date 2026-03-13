@@ -8,7 +8,7 @@ Record the CLI versions this protocol was tested against. When invocation fails 
 
 | CLI | Tested Version | Install | Check Version | Last Verified |
 |-----|---------------|---------|---------------|---------------|
-| Codex CLI | v0.104.0 (rust) | `npm install -g @openai/codex` | `codex --version` | 2026-02-19 |
+| Codex CLI | v0.114.0 (rust) | `npm install -g @openai/codex` | `codex --version` | 2026-03-13 |
 
 **Update policy**: When a CLI update breaks invocation, update this file with the new version and adjusted flags. Include the date and what changed.
 
@@ -38,7 +38,15 @@ echo 'PROMPT_TEXT' | codex exec --json --sandbox read-only -
 
 # Combined: specific model + high reasoning + JSON + read-only
 echo 'PROMPT_TEXT' | codex exec --json -m gpt-5.4 -c model_reasoning_effort="high" --sandbox read-only -
+
+# With workspace write (for file modification tasks)
+echo 'PROMPT_TEXT' | codex exec --json -C /path/to/repo --sandbox workspace-write -
+
+# Multi-turn: resume a previous session by thread_id
+echo 'FOLLOW_UP' | codex exec resume --json {thread_id} -
 ```
+
+**Multi-turn via exec resume**: The initial `codex exec` call returns a `thread.started` event containing a `thread_id`. Subsequent calls use `codex exec resume {thread_id}` to continue the same session with full conversation history preserved. Note: resume inherits the sandbox mode from the original session — `--sandbox` cannot be overridden on resume.
 
 **Reasoning effort levels**:
 

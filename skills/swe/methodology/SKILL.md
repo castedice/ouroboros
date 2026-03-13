@@ -95,8 +95,8 @@ Traversal behavior is configured via `--policy` on the spiral command. Each poli
 
 | Policy | Behavior | Status |
 |--------|----------|--------|
-| **probe** | Light-first exploration → user confidence check → keep Light result or escalate to target depth. Default policy. | Available |
-| **linear** | Direct execution at target depth with user-initiated regression. Max 3 backward transitions per turn. | Available |
+| **linear** | Direct execution at target depth with user-initiated regression. Max 3 backward transitions per turn. Default policy. | Available |
+| **probe** | Light-first exploration → user confidence check → keep Light result or escalate to target depth. | Available |
 | **team** | Director + 3 Specialists (Shaper/Builder/Critic) execute composites concurrently. Auto-gates enable pipelined start — next composite begins immediately while cross-review validates the previous. See `references/team-execution-pattern.md`. | Available |
 | **team+probe** | Composes team pipelining with probe's adaptive depth. Each specialist runs at Light depth first, then user decides to keep or escalate based on cross-review findings. See `references/team-execution-pattern.md` § Probe Composition Protocol. | Available |
 
@@ -106,15 +106,15 @@ The spiral state machine (`spiral-state.json`) tracks execution regardless of po
 
 ## Common Pitfalls
 
-| Pitfall | Stage | Prevention |
-|---------|-------|------------|
-| Jumping to code without understanding the domain | Understand | Require explicit domain model before proceeding |
-| Skipping Constrain ("we'll figure it out") | Constrain | Every design decision must trace to at least one constraint |
-| Over-designing beyond constraints | Design | Constraint Profile is the scope boundary — design only what constraints require |
-| Modifying tests to fit implementation | Test → Implement | Tests are contracts — if tests need changing, return to Interface |
-| Optimizing without profiling data | Optimize | Require profiling evidence before any optimization change |
-| Treating depth as fixed per project | All | Depth is per-stage, per-task — a single project may have Deep Understand and Light Optimize |
-| Confusing Design with Optimize | Design/Optimize | Design = structural decisions. Optimize = profiling-based tuning of existing structure |
+| Pitfall | Stage | Bias | Prevention |
+|---------|-------|------|------------|
+| Jumping to code without understanding the domain | Understand | Action Bias | Require explicit domain model before proceeding |
+| Skipping Constrain ("we'll figure it out") | Constrain | Optimism Bias | Every design decision must trace to at least one constraint |
+| Over-designing beyond constraints | Design | Scope Creep | Constraint Profile is the scope boundary — design only what constraints require |
+| Modifying tests to fit implementation | Test → Implement | Confirmation Bias | Tests are contracts — if tests need changing, return to Interface |
+| Optimizing without profiling data | Optimize | Premature Optimization Bias | Require profiling evidence before any optimization change |
+| Treating depth as fixed per project | All | Anchoring Bias | Depth is per-stage, per-task — a single project may have Deep Understand and Light Optimize |
+| Confusing Design with Optimize | Design/Optimize | Category Error | Design = structural decisions. Optimize = profiling-based tuning of existing structure |
 
 ## Validation Checklist
 

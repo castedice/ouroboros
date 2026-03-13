@@ -37,7 +37,7 @@ Specialists are always referenced by their role name (`shaper`, `builder`, `crit
 
 ### Shaper
 
-```
+```text
 You are Shaper — the Specification Specialist in a spiral team.
 
 Primary responsibility: Execute Spec stages (1-4: Understand, Constrain, Design, Interface).
@@ -71,7 +71,7 @@ State tracking:
 
 ### Builder
 
-```
+```text
 You are Builder — the Development Specialist in a spiral team.
 
 Primary responsibility: Execute Dev stages (5-8: Test, Implement, Verify, Optimize).
@@ -102,7 +102,7 @@ State tracking:
 
 ### Critic
 
-```
+```text
 You are Critic — the Quality & Security Specialist in a spiral team.
 
 Primary responsibility: Execute Ship composite via `Skill: ouroboros:swe:ship` (Ship is a unified composite — no stage-level split needed since its internal stages are already parallelized: Security Review ‖ Code Review).
@@ -130,7 +130,7 @@ v0.16.5 default for team policy: Specialists invoke **primitive commands individ
 
 Instead of `Skill: ouroboros:swe:spec` (black box — 4 stages run internally), Shaper executes:
 
-```
+```text
 Skill: ouroboros:swe:understand  → message to Director
 Skill: ouroboros:swe:constrain   → message to Director
 Skill: ouroboros:swe:design      → message to Director  ← Critic cross-review can start here
@@ -143,11 +143,12 @@ Same pattern for Builder (Dev) and Critic (Ship stages where applicable). Each p
 
 After completing each primitive stage, the specialist sends a progress update:
 
-```
+```text
 SendMessage(recipient: "director", content: "Stage complete: {stage_name}. Artifact: .swe/active/{NN}-{stage}.md. Proceeding to {next_stage}.", summary: "{stage_name} complete")
 ```
 
 Director receives the message and:
+
 1. Updates state: `spiral-state.sh stage-update {specialist} {stage} completed`
 2. Checks for pending actions (cross-review trigger, halt instruction, Bridge artifact handoff)
 3. Responds only if action is needed — no-op means specialist continues
@@ -172,6 +173,7 @@ Primitives invoked standalone by specialists may display user review checkpoints
 ### Composite-Level Fallback
 
 Stage-level execution is the default for team policy at Standard+ depth. Fallback to composite-level (v0.16.0 behavior) when:
+
 - `--fast` flag is set (Light depth — stage-level overhead not worth it)
 - `--composite-level` explicitly requested
 - Specialist failure recovery (Director executes remaining stages as a single composite)
@@ -182,7 +184,7 @@ When `--policy team+probe`, each composite runs at Light depth first (probe), th
 
 ### Execution Flow
 
-```
+```text
 1. Director assigns composite to Specialist at --depth Light
 2. Specialist executes (stage-level or composite-level, same as team policy)
 3. Specialist sends result to Director
@@ -230,11 +232,12 @@ When `--route` is specified, Director can delegate individual stages to external
 
 ### Route Table Format
 
-```
+```text
 --route "understand=codex,design=claude,implement=codex"
 ```
 
 Parsing rules:
+
 - Comma-separated `{stage}={model}` pairs
 - Valid stages: `understand`, `constrain`, `design`, `interface`, `test`, `implement`, `verify`, `optimize`
 - Valid models: `codex`, `claude` (explicit Claude assignment, same as default)
@@ -245,13 +248,13 @@ Parsing rules:
 
 At each stage assignment, Director checks the routing table:
 
-```
+```text
 1. Look up stage in routing table
 2. If model == "claude" (or not in table):
    → Assign to the owning Claude specialist (Shaper for spec stages, Builder for dev stages)
 3. If model == "codex":
    → Assign to Bridge Agent via SendMessage with stage details and target model
-   → Bridge executes stage via MCP, saves artifact, reports back
+   → Bridge executes stage via codex exec, saves artifact, reports back
 4. Director updates state regardless of which agent executed the stage
 ```
 
@@ -262,16 +265,16 @@ When stage-level execution is active (Standard+ depth), routing applies per-prim
 Bridge Agent is spawned only when the routing table contains at least one external model assignment:
 
 1. **Spawn**: During Phase 2.7 Team Setup, after Claude specialists. `Agent(name: "bridge", subagent_type: "general-purpose", team_name: "{team_name}")` with Bridge system prompt from `agents/swe/bridge.md`
-2. **Reuse**: A single Bridge Agent handles all externally-routed stages. Director sends each assignment sequentially via SendMessage — Bridge maintains its own MCP conversation context per stage
+2. **Reuse**: A single Bridge Agent handles all externally-routed stages. Director sends each assignment sequentially via SendMessage — Bridge maintains its own exec session (thread_id) per stage
 3. **Shutdown**: With other specialists in Phase 11
 
-### MCP Availability Check
+### Codex CLI Availability Check
 
-Before spawning Bridge Agent, Director verifies MCP server availability:
+Before spawning Bridge Agent, Director verifies Codex CLI availability:
 
-1. Check if the target MCP tools are accessible (Bridge Agent checks on startup and reports)
-2. If MCP server for a routed model is unavailable:
-   - Log: "Warning: {model} MCP server not available. Falling back to Claude specialist for {stage}."
+1. Check if Codex CLI is installed (`which codex` — Bridge Agent checks on startup and reports)
+2. If Codex CLI is unavailable:
+   - Log: "Warning: Codex CLI not available. Falling back to Claude specialist for {stage}."
    - Reassign affected stages to Claude specialist
    - If all external routes fall back: skip Bridge Agent spawn entirely
 
@@ -293,7 +296,7 @@ Bridge Agent is a team member like Shaper, Builder, and Critic — it communicat
 
 Director sends stage assignments to Bridge via SendMessage:
 
-```
+```text
 SendMessage(recipient: "bridge", content: "
 Stage: {stage_name}
 Model: {codex}
@@ -304,7 +307,7 @@ Upstream artifacts: {.swe/active/ artifact paths}
 ", summary: "Route {stage_name} to {model}")
 ```
 
-Bridge reads the assignment, gathers context, and begins the MCP conversation with the external model.
+Bridge reads the assignment, gathers context, and begins the exec session with the external model.
 
 ### Artifact Handoff
 
@@ -314,8 +317,8 @@ Bridge saves stage artifacts to the same paths as Claude specialists — `.swe/a
 
 Primarily single-turn with quality iteration:
 
-```
-Bridge → External Model (MCP): "Analyze this task and produce {artifact type}." + context
+```text
+Bridge → External Model (exec): "Analyze this task and produce {artifact type}." + context
 External Model → Bridge: artifact content
 Bridge: Evaluate completeness (required sections? domain terms? constraints?)
   If insufficient → follow-up with specific gaps
@@ -327,8 +330,8 @@ Bridge → Director: "Stage complete: {stage}. Artifact: {path}."
 
 Multi-turn with file operations:
 
-```
-Bridge → External Model (MCP): "Given these contracts and tests, how should we implement?" + context
+```text
+Bridge → External Model (exec): "Given these contracts and tests, how should we implement?" + context
 External Model → Bridge: implementation approach / code
 Bridge: Write/Edit source files based on guidance
 Bridge: Run tests via Bash
@@ -367,7 +370,7 @@ The key difference from linear/probe policy: composites overlap. After each comp
 
 Stage-level execution (default at Standard+ depth):
 
-```
+```text
 Shaper:  [U][C][D]──Critic review starts──[I]    [cross-review Dev]    [prep]
 Builder:   [codebase prep]        [T][Imp]──Shaper review starts──[V][O]  [fix]
 Critic:            [cross-review Spec]  [early scan]          [═══ Ship ═══]
@@ -376,7 +379,7 @@ Director: ─────auto-gate──────────────auto
 
 Composite-level fallback (--fast or --composite-level):
 
-```
+```text
 Shaper:  [════ Spec ════]          [cross-review Dev]    [next-turn prep]
 Builder:   [codebase prep]  [═══════════ Dev ═══════════]  [fix if needed]
 Critic:                  [cross-review Spec] [scan]  [════ Ship ════]
@@ -467,7 +470,7 @@ Exception: Phase 8 (Ship → Tune) is blocking — Director explicitly waits for
 
 Reviewer sends findings to Director via SendMessage:
 
-```
+```text
 Cross-review complete: {target} artifacts.
 
 P1 findings: {count}
@@ -488,7 +491,7 @@ Director saves the full findings to `.swe/active/.team/{reviewer}-{target}-revie
 
 When cross-review reports P1 findings, Director evaluates severity against downstream progress:
 
-```
+```text
 Cross-review P1 finding received
 ├── Is the next composite already running?
 │   ├── No (not started yet)
@@ -525,7 +528,7 @@ Tune in team policy collects perspectives from all 3 specialists before executio
 
 Director sends perspective requests to all 3 specialists simultaneously:
 
-```
+```text
 SendMessage(recipient: "shaper", content: "Spiral Tune: Share your domain insights — what was well-understood vs surprising in the Spec? What would you change in the next turn's specification?")
 SendMessage(recipient: "builder", content: "Spiral Tune: Share your implementation insights — what technical challenges did you encounter? What technical debt remains? What would make the next Dev cycle smoother?")
 SendMessage(recipient: "critic", content: "Spiral Tune: Share your quality summary — what findings were most significant? What process improvements would reduce defects? Were the cross-reviews valuable?")
@@ -535,7 +538,7 @@ SendMessage(recipient: "critic", content: "Spiral Tune: Share your quality summa
 
 After receiving all 3 responses, Director saves perspectives to `.swe/active/.team/tune-perspectives.md` and invokes Tune:
 
-```
+```text
 Skill: ouroboros:swe:tune
 Args: "{task}" --depth {tune_depth} --artifact {ship_report_path}
 ```
@@ -547,11 +550,13 @@ The perspectives file is available in `.swe/active/.team/` for the Tune composit
 After Phase 10 (Report) completes:
 
 1. Director sends `shutdown_request` to all 3 specialists:
-   ```
+
+   ```text
    SendMessage(type: "shutdown_request", recipient: "shaper", content: "Spiral complete. Shutting down team.")
    SendMessage(type: "shutdown_request", recipient: "builder", content: "Spiral complete. Shutting down team.")
    SendMessage(type: "shutdown_request", recipient: "critic", content: "Spiral complete. Shutting down team.")
    ```
+
 2. Wait for all 3 `shutdown_response(approve: true)` confirmations
 3. Clean up: state file records team shutdown timestamp
 4. Team resources are released
@@ -608,7 +613,7 @@ At Standard+ depth in team policy, Design and Interface stages can use 2-pass ve
 
 ### Loop Sequence
 
-```
+```text
 1. Shaper completes Design → sends to Director
 2. Director assigns quick review to Critic: "Review Design artifact for P1 issues only."
 3. Critic reviews → sends findings to Director
@@ -624,7 +629,7 @@ At Standard+ depth in team policy, Design and Interface stages can use 2-pass ve
 
 When a P1 revision triggers re-entry into a completed stage:
 
-```
+```bash
 spiral-state.sh stage-update shaper design completed   ← initial completion
   Critic reviews → P1 found
 spiral-state.sh stage-update shaper design running     ← re-enter for revision

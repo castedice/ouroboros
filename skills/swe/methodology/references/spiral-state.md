@@ -77,7 +77,7 @@ The linear policy formalizes the current forward-only behavior with explicit reg
 
 ## Probe Policy Transition Table
 
-The probe policy (default) wraps each composite in a Light-first exploration. Each composite runs at Light depth, then the user decides whether the result is sufficient or needs escalation to the target depth. Gates are unchanged — they verify the final artifact regardless of how it was produced.
+The probe policy wraps each composite in a Light-first exploration. Each composite runs at Light depth, then the user decides whether the result is sufficient or needs escalation to the target depth. Gates are unchanged — they verify the final artifact regardless of how it was produced.
 
 | Current Stage | Probe Run | Confidence Check | Escalate Path |
 |---------------|-----------|------------------|---------------|

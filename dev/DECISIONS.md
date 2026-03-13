@@ -793,6 +793,7 @@ Severity gate (SonarQube-inspired): Foundation failures cap maximum achievable l
 | R4 | gpt-5.2 | high | 7.75 | 6.0 | 64s | 4/4 |
 
 Key findings:
+
 1. R2 is optimal — 44% faster than R1 with minimal quality loss (7.25 vs 8.25 findings avg)
 2. gpt-5.2 (R4) comparable quality but 33% slower than gpt-5.3-codex (R2) at same effort
 3. Pattern coverage limited by input scope (only README/CLAUDE.md/plugin.json), not model capability — 4/6 ground truth patterns required source code not included
@@ -809,6 +810,7 @@ Key findings:
 | G3 | gpt-5.3-codex | medium | 7314 | 86s | 16/16 | 4/4 |
 
 Key findings:
+
 1. All configs produce structurally complete components targeting Level 4 (Excellent) — structural quality is consistent across effort levels
 2. G2 is the sweet spot: 1.7× faster than G1, comparable quality, best "innovation density" (novel structural additions like integration contracts, content safety sections)
 3. Qualitative depth differences are subtle: G1 has most precise wording, G2 adds most innovative structures, G3 is adequate but slightly generic on edge cases
@@ -826,6 +828,7 @@ Key findings:
 | RC2 | gpt-5.3-codex | high | 8.5 | 114s | 2/2 | 0 | 14574 | 2/2 |
 
 Key findings:
+
 1. RC2 is optimal — 3.5× faster than RC1 with equivalent merge quality
 2. All 4 runs correctly preserve local calibration section (decision entry intent) while incorporating upstream additions (scoring reference table, tool fallback)
 3. RC2 is perfectly reproducible (identical content hash across runs), RC1 has minor variation (1 char diff)
@@ -844,11 +847,13 @@ Key findings:
 | **reconciler** | gpt-5.3-codex | high | RC2 optimal: 3.5× faster than xhigh, identical merge quality and reproducibility. Opus orchestrator validates merged content before applying |
 
 **Why `high` for researcher/generator/reconciler but `xhigh` for evaluator:**
+
 - Evaluator needs **reproducibility** (same input → same score across runs). xhigh provides deterministic E4 judgment; high fluctuates.
 - Researcher/generator/reconciler need **adequate quality** within a pipeline where Claude orchestrator does final selection/validation. The 44-70% latency savings compound across multi-model command runs.
 - Generated and merged content is always independently validated before use — the orchestrator catches quality issues the delegation misses.
 
 **Alternatives rejected:**
+
 - **gpt-5.3-codex medium for all agents**: Adequate structurally but less depth in edge-case handling and integration documentation. Not worth the risk for researcher analysis that informs knowledge base entries.
 - **gpt-5.2 for researcher**: Comparable quality but 33% slower with no advantage. gpt-5.3-codex dominates on speed.
 - **gpt-5.3-codex xhigh for generator**: 2.8× slower than medium, 1.7× slower than high, with no measurable structural quality improvement. Qualitative precision gain is marginal and mitigated by downstream /evaluate validation.
@@ -943,6 +948,7 @@ Key findings:
 **Decision:** Module is named `swe` (Software Engineering), not `dev`.
 
 **Rationale:**
+
 - `develop` shortened to `dev` is the natural name for the implementation composite command
 - Using `dev` for both module and command would create `/dev dev` collision
 - `swe` is widely recognized in the tech industry (Software Engineer = SWE)
@@ -968,6 +974,7 @@ The pipeline is invariant — every task traverses the same sequence. Only the d
 **Design vs Optimize boundary:** Design stage makes the big algorithmic decisions (data structure selection, algorithm choice, performance characteristics). Optimize stage does post-implementation fine-tuning based on profiling — not wholesale redesign.
 
 **Depth levels:**
+
 - **Skip**: Stage not applicable
 - **Light**: Minimal (inline notes, minutes)
 - **Standard**: Structured document (template-based, hours) — default
@@ -978,6 +985,7 @@ The pipeline is invariant — every task traverses the same sequence. Only the d
 **Decision:** Follow the ouroboros core pattern (DR-016) — primitives compose into composites, composites compose into meta-composite.
 
 **Primitives** (8 individual commands, each independently executable):
+
 - `/swe understand`, `/swe constrain`, `/swe design`, `/swe interface`
 - `/swe test`, `/swe implement`, `/swe verify`, `/swe optimize`
 
@@ -991,6 +999,7 @@ The pipeline is invariant — every task traverses the same sequence. Only the d
 | `/swe tune` | evaluate + improve + retrospect | "Tune" — fine-tuning, calibration |
 
 **Meta-composite** (1 turnkey command):
+
 - `/swe spiral` = spec → dev → ship → tune (one full spiral)
 
 **Ouroboros cycle connection:**
@@ -1064,6 +1073,7 @@ The pipeline embodies three established software engineering methodologies, each
 - **Run**: deferred to future phase
 
 **Rationale:**
+
 - Build is the core value proposition — solving the "AI only helps with coding" problem
 - Ship is a natural extension that completes the delivery cycle
 - Run (SRE/ops) is a distinct domain with different tooling needs; better as a later addition
@@ -1078,7 +1088,7 @@ The pipeline embodies three established software engineering methodologies, each
 **Context:** SWE pipeline generates ~10 artifacts per spiral turn per component. After 3 turns on mdsearch, 22 files (276KB) accumulated in a flat `.swe/artifacts/` directory with no lifecycle management. Projected to 600+ files for a real project. Core module (knowledge, evaluations, decisions) has the same accumulation pattern. Brainstorm produced 14 ideas across 4 techniques; user discussion refined through 3 rounds.
 **Decision:** Three-tier directory structure with full retention:
 
-```
+```text
 .swe/
 ├── active/                              # Current spiral turn (bounded)
 │   └── {NN}-{stage}.md                  # Numbered by stage order
@@ -1089,6 +1099,7 @@ The pipeline embodies three established software engineering methodologies, each
 ```
 
 Key principles:
+
 - **Keep everything**: Text files are cheap. No deletion. Git diff tracks changes over time
 - **Monorepo-first**: Package-level grouping. Single-repo projects use one package directory
 - **Order within package**: Turn numbering is scoped to package, enabling per-package engineering history
@@ -1096,6 +1107,7 @@ Key principles:
 - **Agent-efficient**: active/ is always bounded (max ~10 files). Agents look here for current context
 
 **Alternatives rejected:**
+
 - Delete After Tune (#6): User preferred retaining all artifacts for traceability
 - Global sequential numbering: Doesn't scale for monorepos where packages have independent histories
 - Component-only grouping (no order): Loses chronological decision flow within a package
@@ -1265,6 +1277,7 @@ Key principles:
 **Context**: v0.14.7 achieved SWE 18/18 Level 4. The spiral (`/swe spiral`) is the meta-composite orchestrating Spec→Dev→Ship→Tune, but it's strictly linear: no backward transitions (despite declaring support), no parallel execution, no adaptive depth. Dogfooding on mdsearch (3 tasks) revealed: backward transition never used (even when needed — task 003 SAFETY-2 should have regressed to Design), Ship P2 issues deferred to next cycle instead of fixed, and users bypass the spiral for lightweight tasks. Research phase: Double Diamond (1st Research → Brainstorm → 2nd Research) produced 2 knowledge entries and 14 brainstorm ideas across 4 techniques.
 
 **Research evidence base**:
+
 - `docs/knowledge/ai-native-development-workflow-patterns.md` — 18 sources: state machine > DAG (LangGraph, Temporal, Val Town convergence), 3 orchestration primitives (sequential/parallel/iterative), checkpoint-based decomposition (Devin), mode consolidation pressure (OMC 9→fewer), "15-minute waterfall" as dominant AI-native micro-methodology
 - `docs/knowledge/spiral-architecture-implementation-patterns.md` — 15 sources: LangGraph transition function table (`add_conditional_edges`), Temporal FSM with signals, LangGraph SQLite checkpoint schema (`parent_checkpoint_id` linked list), CI/CD cascade invalidation unsolved (Buildkite doesn't support it), ActionPlan probe boundary pattern, Dapr compensation pattern (unnecessary for pure artifact transforms)
 
@@ -1320,6 +1333,7 @@ Single JSON file in `.swe/active/`. Schema refined from LangGraph checkpoint mod
 Backward transition = restore checkpoint N, re-execute from there. Artifact versioning via `.swe/active/.versions/{NN}-{stage}.v{N}.md`.
 
 Cascade invalidation algorithm (novel — CI/CD systems don't support this natively):
+
 1. When Stage N artifact is re-versioned, traverse Selective Load Matrix in `artifact-contracts.md`
 2. Downstream stages with "Required" dependency → invalidated (must re-execute)
 3. Downstream stages with "Optional" dependency → stale (re-evaluate, may preserve)
@@ -1359,11 +1373,13 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 **Context**: v0.15.0 delivered the state machine with `linear` as the only policy. Planning v0.15.1 (probe policy), UX review revealed the spiral's flag surface was already complex (`--fast`, `--depth`, `--policy`), and adding `--policy probe` as opt-in would increase cognitive load. The depth and policy flags were conceptually coupled — `--fast` is a depth shortcut but behaves differently under different policies.
 
 **Decision**: Make `probe` the default policy and restructure depth/policy as orthogonal dimensions:
+
 - **Depth** (how deep): `--fast` (Light) / default (Standard) / `--deep` (Deep, new) / `--depth S:Deep D:Std ...` (per-composite)
 - **Policy** (how to traverse): `probe` (default) / `linear` (opt-in) / `parallel` (future)
 - Depth controls the escalation target, policy controls the traversal behavior. Each dimension is independent.
 
 **Rationale**:
+
 - Probe as default means the simplest invocation (`/swe spiral "task"`) uses the smartest traversal — Light first, escalate only if needed
 - `--fast` semantics unchanged from user perspective (still "quick"), but now explained as "Light target where probe degrades to direct execution"
 - `--deep` added as symmetric counterpart to `--fast` — `--depth Deep` shortcut
@@ -1371,6 +1387,7 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 - Confidence check is user-driven (no auto-threshold) — DR-058 rejected automated confidence as uncalibrated
 
 **Alternatives rejected**:
+
 1. **Probe as opt-in (`--policy probe`)** — adds a flag for the recommended default behavior; users who don't know about it miss the benefit
 2. **Auto-escalate** — requires quality criteria that don't exist yet; deferred until dogfooding provides calibration data
 3. **Named presets (`--preset quick/explore/thorough`)** — replaces two orthogonal dimensions with a flat list; less composable
@@ -1384,6 +1401,7 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 **Context**: v0.15.5 was originally planned as "Parallel Policy" — a spiral-level `--policy parallel` with worktree fan-out/fan-in across composites. Analysis revealed this was infeasible: the SWE artifact chain is strictly sequential (each composite depends on the previous composite's output). However, independent sub-stages within composites exist: Ship has Security Review + Code Review (both read implementation artifacts independently), Tune has Improve + Retrospect (different file domains — source code vs. artifact chain). Additionally, core commands have mature `--multi` (11+ commands) but SWE pipeline had zero multi-model support.
 
 **Decision**: Two independent parallelism axes, both composite-internal:
+
 - **Stage parallelism** (speed, always active): At Standard+ depth, independent sub-stages run as parallel Tasks. Ship: Security Review ‖ Code Review. Tune: Improve ‖ Retrospect. No opt-in needed — reviewer Tasks are read-only, Improve/Retrospect touch different files.
 - **Multi-model parallelism** (quality, `--multi` opt-in): Ship adds Codex security + code reviews alongside Claude (2×2 grid). Tune adds Codex evaluator alongside Claude evaluator. Finding union + severity consensus for reviews; priority consensus for evaluation targets.
 - **Spiral-level `--policy parallel` removed** from the roadmap. Stage-level parallelism is composite-internal, not a traversal policy.
@@ -1391,6 +1409,7 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 - **P1 severity disputes resolve to P1** — false negatives (missing a critical finding) are more costly than false positives.
 
 **Alternatives rejected**:
+
 1. **Spiral-level `--policy parallel`** — artifact chain is strictly sequential; composites cannot run in parallel
 2. **Auto-parallelism without flag** — debugging multi-model consensus issues requires explicit opt-in to isolate
 3. **Multi-model for all composites** — Spec (analyst) and Dev (implementer) don't benefit from model consensus; code synthesis is single-model
@@ -1415,6 +1434,7 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 - **State machine v2**: `spiral-state.json` gains `team` section (specialist status, cross-review tracking) with version bump to 2. Backward-compatible — non-team policies use version 1 schema.
 
 **Alternatives rejected**:
+
 1. **Separate `team-spiral.md` command** — mode proliferation (OMC research warning). Single entry point with policy flag is more composable and discoverable.
 2. **Director-only Skill invocation (advisory specialists)** — tested in design phase; no genuine collaboration, just "sequential pipeline with background readers." Contradicts the goal of real concurrent engineering.
 3. **Stage-level pipelining (primitive commands)** — deferred to v0.16.5. Composite-level pipelining provides meaningful overlap with manageable orchestration complexity. Stage-level adds mid-composite intervention but requires message checkpoints between every stage.
@@ -1452,6 +1472,7 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 | Learning delta format | Advisory only | Delta recommends depth adjustments; user decides. No auto-adjustment — avoids feedback loops |
 
 **Alternatives rejected**:
+
 1. **API key-based MCP** — rejected by user due to double-billing (subscription + API). Subscription-based MCP reuses existing ChatGPT Plus/Gemini Pro subscriptions.
 2. **Bridge as general-purpose subagent** — too much autonomy. Bridge should relay decisions, not make them. sonnet model + structured protocol keeps it focused.
 3. **Auto-escalation in team+probe** — deferred. User-driven escalation decisions maintain transparency. Future versions may add confidence-based auto-escalation.
@@ -1482,6 +1503,7 @@ New reference files: `skills/swe/methodology/references/spiral-state.md` (state 
 | Confidence markers | Mandatory in reverse | Forward analysis has requirements as source of truth. Reverse has only code — inference must be marked |
 
 **Alternatives rejected**:
+
 1. **`/adopt --swe`** — would overload adopt's project analysis purpose. Reverse is about specification recovery, not project onboarding.
 2. **4 separate analyst calls for reverse** — inefficient for shared codebase context. Single invocation avoids redundant file reading.
 3. **Teaching in `skills/swe/`** — too narrow. Teaching methodology is domain-independent.
@@ -1546,6 +1568,7 @@ v1.0.0 follows after v0.19.0.
 **Change scope:** ~25 files. Delete GEMINI.md, remove gemini case from invoke-model.sh, remove gemini references from 5 commands, convert 7 routing skill files to 2-model, clean up agents/templates/docs. Historical records (DECISIONS.md, PLAN.md, ROADMAP.md, CHANGELOG.md, dev/experiments/) are preserved.
 
 **Rejected alternatives:**
+
 1. **mcacp ACP-to-MCP bridge** — Exposes Gemini `--experimental-acp` via MCP. Uses OAuth so same account suspension risk
 2. **AI Studio free API key** — 100 requests/day possible, but Gemini utilization is too low to justify maintenance cost
 3. **Separate Google account** — Provides isolation but increases management complexity, not a fundamental solution
@@ -1571,6 +1594,7 @@ v1.0.0 follows after v0.19.0.
 | doctor.md | settings/hooks/plugin files | Static file inspection, not runtime state |
 
 **Key design choices:**
+
 1. **Git-based session history** — Uses `git log` instead of Claude session directory (`~/.claude/projects/`). Does not break on path changes
 2. **3-tier parallel resilience** — manifest-based collect → raw file re-parse → transcript recovery. Independent of existing capture-output.sh
 3. **PermissionRequest hook** — Asynchronously records user choices. Consumed as deny patterns by friction-report
@@ -1595,6 +1619,7 @@ v1.0.0 follows after v0.19.0.
 | `docs/specs/knowledge/INDEX.md` | Knowledge base auto-index |
 
 **Key design choices:**
+
 1. **4 separate files** — Corresponds to Stages 1-4. Enables per-stage independent updates and selective reading over a single file
 2. **Git-based tracking** — `git log project/*.md` = evolution timeline, `git diff` = per-feature changes, record/ = rationale for changes (why)
 3. **Update timing Phase 10.6** — After archive (10.5), before team shutdown (11). Updated as late as possible to be safe against regression/rollback within the spiral
@@ -1621,6 +1646,7 @@ v1.0.0 follows after v0.19.0.
 Monorepo: `packages/{pkg}/docs/specs/{project,record,knowledge}/` + `packages/{pkg}/.swe/active/`
 
 **Key design choices:**
+
 1. **`docs/specs/` naming** — `docs/swe/` looks SWE-module-specific. `specs/` is the natural container for specification artifacts
 2. **`.swe/active/` retained** — In-progress artifacts should remain gitignored. Moved to `docs/specs/record/` after completion
 3. **Monorepo workspace detection** — Supports pnpm-workspace.yaml, Cargo.toml `[workspace]`, go.work, package.json `workspaces`
@@ -1672,7 +1698,32 @@ Monorepo: `packages/{pkg}/docs/specs/{project,record,knowledge}/` + `packages/{p
 3. **Single model also explicit** — `eval-hash file.md claude-opus-4-6` (previously treated as identical to content_hash)
 
 **Examples:**
+
 - Single: `eval-hash doctor.md claude-opus-4-6`
 - Dual: `eval-hash doctor.md claude-opus-4-6 gpt-5.4:xhigh`
 
 **Consequence:** Any model combination is reflected in eval_hash, enabling accurate tracking of evaluation differences caused by model changes. Recalculated eval_hash for all 46 existing evaluation JSONs using the new method. DR-069's content_hash remains unchanged.
+
+## DR-072: Codex MCP → exec Migration
+
+**Date:** 2026-03-13
+**Status:** active
+**Context:** Codex MCP server (`codex mcp-server`) has a process termination bug — sessions sometimes fail to exit cleanly, leaving orphan processes. Additionally, `codex exec resume` now supports multi-turn conversations via thread_id, eliminating the primary advantage MCP had over exec (session persistence).
+
+**Decision:** Remove Codex MCP entirely and use `codex exec` for all Codex interactions:
+
+| Concern | MCP | exec |
+|---------|-----|------|
+| Process lifecycle | Buggy — hangs after completion | Clean — exits after each invocation |
+| Multi-turn | MCP session | `exec resume {thread_id}` |
+| File modification | Configurable per-request | `--sandbox workspace-write` (fixed at start) |
+| Mid-execution approval | External caller can handle | Not possible (`approval_policy = never`) |
+
+**Also decided:** Share ouroboros skills with Codex via symlinks (`~/.codex/skills/` → `skills/{module}/`). Codex and Claude Code use compatible SKILL.md format (YAML frontmatter with `name` + `description`, markdown body, `references/` directory). Platform-specific frontmatter fields (`allowed-tools`, `model` for Claude; `agents/openai.yaml` for Codex) are ignored by the other platform.
+
+**Alternatives rejected:**
+
+- Keep MCP and work around the bug — fragile, adds complexity
+- Use MCP for multi-turn only — unnecessary split when exec resume covers the same use case
+
+**Consequence:** `.mcp.json` deleted. Bridge Agent rewritten from MCP to exec+resume. All MCP references in spiral.md, team-execution-pattern.md updated. 12 ouroboros skills symlinked to `~/.codex/skills/` and verified working (Codex auto-discovers and uses them via description-based matching). Invocation protocol updated to v0.114.0 with exec resume documentation.

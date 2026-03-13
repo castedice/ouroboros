@@ -104,12 +104,12 @@ Every stage has a configurable depth level: **Skip**, **Light**, **Standard**, *
 
 Three **traversal policies** control how stages are traversed:
 
-- **probe** (default) — Light-first exploration with confidence-gated escalation
-- **linear** — execute all stages at specified depth
+- **linear** (default) — execute all stages at specified depth, prompt for depth at start
+- **probe** — Light-first exploration with confidence-gated escalation
 - **team** — multi-agent pipelined execution (Director + Shaper/Builder/Critic)
 
 ```bash
-# Probe policy (default) — explore light, escalate if needed
+# Linear policy (default) — prompts for depth, then executes directly
 /swe spiral "Fix pagination bug"
 
 # Custom depth per composite
