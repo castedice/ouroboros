@@ -1,5 +1,8 @@
 # Ouroboros — The Plugin That Builds Plugins
 
+[![Release](https://img.shields.io/github/v/release/castedice/ouroboros)](https://github.com/castedice/ouroboros/releases/latest)
+[![License](https://img.shields.io/github/license/castedice/ouroboros)](LICENSE)
+
 > Like the serpent eating its own tail, each cycle makes the next one stronger
 
 Ouroboros is a **meta-plugin** for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It researches, generates, evaluates, and evolves Claude Code plugins — including itself. It ships with two modules: **Core** (meta-plugin operations) and **SWE** (disciplined software engineering).
