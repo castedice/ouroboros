@@ -1,5 +1,6 @@
 ---
-description: "Spiral meta-composite — orchestrate the full engineering cycle: spec → dev → ship → tune, with each turn's learnings feeding the next"
+name: swe:spiral
+description: "Use when you need an end-to-end engineering loop that can refine a task over one or more iterations"
 argument-hint: "<task-description> [--fast] [--deep] [--depth <global|per-composite>] [--policy <name>] [--single] [--route <stage=model,...>]"
 allowed-tools: Read, Glob, Grep, Write, Skill, Bash, Agent, TeamCreate, SendMessage, TeamDelete
 ---
@@ -19,6 +20,19 @@ Target: $ARGUMENTS
 | 7 | `/swe ship` | Integration → Security → Review → Deploy | Release — from code to production readiness |
 | 9 | `/swe tune` | Evaluate → Improve → Retrospect | Tuning — from release to learnings |
 
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass spiral state paths, entry artifact paths, and inline summaries on every delegated call.
+Use named return payloads rather than prose-only summaries.
+The command owns checkpoints, archival, project-model updates, and every file mutation.
+Composite Skill delegation is additive command evidence, and team specialists return structured packets rather than direct writes.
+
+| Agent | Phases | Input | Expected Output |
+|-------|--------|-------|-----------------|
+| `Skill("swe:{spec|dev|ship|tune}")` | 3, 5, 7, and 9 | `task`, composite `depth_level`, `spiral_state`, entry artifact paths, policy flags, and `learning_delta` when present | `artifact_chain`, `review_packet`, `gate_status`, `next_artifact_path`, and optional `blocking_issues[]` |
+| `team specialists: shaper, builder, critic` | 2.7, 4.5, 6.5, and team composite phases | `task`, assigned composite scope, `depth_level`, `route_plan`, `spiral_state`, handed-off artifact paths, and cross-review context | `composite_result`, `cross_review_findings[]`, `probe_result`, `blocking_issues[]`, and `handoff_notes` |
+
 ## References
 
 | Reference | Path | Usage |
@@ -28,7 +42,41 @@ Target: $ARGUMENTS
 | Pipeline Stages | `skills/swe/methodology/references/pipeline-stages.md` | Stage definitions, composite boundaries, ordering constraints |
 | Spiral State | `skills/swe/methodology/references/spiral-state.md` | State machine schema, transition rules, checkpoint protocol, cascade invalidation |
 | Team Execution Pattern | `skills/swe/methodology/references/team-execution-pattern.md` | Team topology, specialist prompts, pipelined flow, auto-gates, cross-review protocol (team policy only) |
-| Spiral Monitor | `scripts/spiral-monitor.sh` | Real-time TUI dashboard for team progress — auto-launched in tmux at init |
+
+## Branch Summary
+
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not initialize state. |
+| `--fast` and `--deep` are both present | 1 | Abort with the flag-conflict error. |
+| `--depth` or `--policy` is invalid | 1 | Abort with the validation error. |
+| `--route` is provided without `team` or `team+probe` policy, or with `--fast` / `--composite-level` | 1, 2.7 | Ignore routing and log why it was disabled. |
+| `--depth` is provided | 2 | Use the parsed global or per-composite depths. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth across Spec, Dev, Ship, and Tune. |
+| `--deep` is provided without `--depth` | 2 | Force Deep depth across Spec, Dev, Ship, and Tune. |
+| No depth shortcut or override is provided | 2 | Ask the user to accept Standard depth or select per-composite depths. |
+| Learning delta exists | 2, 2.5, 2.7, 9, 10 | Preview it before initialization, write it into `.swe/active/learning-delta.json`, and let Tune overwrite it at the end of the turn. |
+| Existing `.swe/active/spiral-state.json` is found | 2.5 | Offer Resume or Restart before initializing a new turn. |
+| `--policy linear` | 3-9 | Execute composites directly with the shared Composite Execution Pattern. |
+| `--policy probe` and target depth is above Light | 3-9 | Wrap each composite in the Probe Execution Pattern. |
+| `--policy team` | 2.7, 3-11 | Spawn specialists, use auto-gates, and run cross-reviews. |
+| `--policy team+probe` | 2.7, 3-11 | Combine team delegation with Light-depth probes and user escalation decisions. |
+| Team setup succeeds | 2.7, 3-11 | Run Shaper, Builder, and Critic with the Team Execution Pattern. |
+| Team setup fails or 2+ specialists fail | 2.7, any team phase | Fall back to linear or probe execution for the remaining composites. |
+| Routed Codex stages are requested and Codex CLI is available | 2.7, team phases | Keep direct relay under the owning specialist and record `mode: direct`. |
+| Routed Codex stages are requested but Codex CLI is unavailable or trips the 3-attempt circuit breaker | 2.7, any team phase | Fall back to the Claude specialist for the affected stages. |
+| Probe result is accepted at Light depth | 3, 5, 7, 9 | Keep the Light artifacts and continue without escalation. |
+| Probe result is escalated | 3, 5, 7, 9 | Checkpoint the Light artifacts and re-run the same composite at target depth. |
+| Spec fails, Interface Contracts are missing, or the user aborts after Spec | 3, 4 | Retry Spec or run `/swe interface` standalone; otherwise abort Spiral. |
+| Dev fails, partial implementation is rejected, or Green state is missing at the Dev → Ship gate | 5, 6 | Retry Dev, regress to Spec, proceed with warning, or abort per the selected path. |
+| Ship fails or the Ship → Tune gate finds P1 issues | 7, 8 | Retry Ship, regress to Dev, abort, or override to continue to Tune depending on the chosen path. |
+| Tune fails | 9, 10 | Log the warning and continue to the final report with partial results. |
+| Team cross-review finds P1 issues during Spec or Dev | 4.5, 6.5 | Follow the regression or defer-to-Tune path from the team protocol. |
+| Team cross-review finds only P2 or P3 issues | 4.5, 6.5, 9 | Record the findings in `.swe/active/.team/` and defer them to Tune. |
+| `.pa/settings.json` is missing | 10.7 | Skip the PA vault bridge silently. |
+| User declines the PA bridge or `/pa ingest` fails | 10.7 | Skip the bridge and do not block spiral completion. |
+| Team policy is active | 10.5, 11 | Archive only after team shutdown completes. |
+| Standalone archival or project-model update fails | 10.5, 10.6 | Warn, preserve active artifacts, and still complete the spiral turn. |
 
 ## Composite Execution Pattern
 
@@ -136,6 +184,7 @@ Extract from $ARGUMENTS:
 | `--policy` | Transition policy preset (see `references/spiral-state.md`) | `linear` |
 | `--single` | Force single-model mode in Ship and Tune (skip external CLIs). Multi-model auto-detected by default | — |
 | `--route` | Per-stage model routing for team policy (e.g., `"understand=codex,implement=codex"`) | All stages → Claude |
+| `route_mode` | Route-plan field for routed stages (`direct`, `bridge`, `dual`) | `direct` |
 | `--composite-level` | Force composite-level execution in team policy (v0.16.0 behavior, skip stage-level) | Off (stage-level is default at Standard+) |
 
 **`--fast` mode**: Sets all composites to Light depth and enables relaxed skip conditions in primitive stages. If both `--fast` and `--depth` are present, `--depth` takes precedence (explicit depth overrides shortcut).
@@ -157,7 +206,14 @@ When `--policy team`: Director spawns 3 Specialists (Shaper, Builder, Critic) th
 
 When `--policy team+probe`: Combines team pipelining with probe's adaptive depth. Specialists execute at Light depth first (probe), then Director relays probe results to the user for escalation decision. Cross-review findings inform the escalation context. See `references/team-execution-pattern.md` § Probe Composition Protocol.
 
-`--route` accepts comma-separated `stage=model` pairs (e.g., `"understand=codex,implement=codex"`). Valid stages: `understand`, `constrain`, `design`, `interface`, `test`, `implement`, `verify`, `optimize`. Valid models: `codex`, `claude`. Unspecified stages default to Claude specialist. Requires `--policy team` or `--policy team+probe` — ignored otherwise. Ignored when `--fast` or `--composite-level` is active (composite-level execution has no per-stage routing). See `references/team-execution-pattern.md` § Selective Routing Protocol.
+`--route` accepts comma-separated `stage=model` pairs (e.g., `"understand=codex,implement=codex"`). Valid stages: `understand`, `constrain`, `design`, `interface`, `test`, `implement`, `verify`, `optimize`. Valid models: `codex`, `claude`. Unspecified stages default to Claude specialist. Requires `--policy team` or `--policy team+probe` and is ignored otherwise. It is also ignored when `--fast` or `--composite-level` is active because composite-level execution has no per-stage routing. See `references/team-execution-pattern.md` § Routing Mode Field and § Selective Routing Protocol.
+
+When team routing is active, Director also records a route-plan field `mode`.
+Use `mode: direct` for the default specialist direct relay path.
+Use `mode: bridge` only as a legacy migration label.
+Use `mode: dual` only for soak-style comparison notes between direct relay and archived bridge behavior.
+Switch modes by changing the route-plan field before Phase 2.7 team setup.
+After bridge removal, new runs should use `mode: direct`.
 
 If `task` is empty:
 
@@ -172,11 +228,7 @@ If `task` is empty:
 4. If none of `--fast`, `--deep`, or `--depth`, prompt the user for depth selection:
    - **Step 1**: Ask "모든 composite를 Standard depth로 진행할까요? (Y/n)". If user confirms (Y or Enter): apply Standard to all composites
    - **Step 2** (user selects n): Present per-composite depth selection: "각 composite의 depth를 지정해 주세요:" with a table showing Spec, Dev, Ship, Tune — each selectable as Light/Standard/Deep. Apply user's selections
-5. **Load learning delta** (team/team+probe policy only): Check for previous turn's delta via `Bash: scripts/spiral-state.sh learning-delta load`. If found, adjust depth recommendations:
-   - `"over"` calibration → suggest lowering one level (e.g., Deep→Standard)
-   - `"under"` calibration → suggest raising one level (e.g., Light→Standard)
-   - Present adjustments to user: "Previous turn learning: {composite} was {over/under}-specified. Suggesting {adjusted_depth}."
-   - User decides whether to accept the suggestion — learning delta is advisory, not automatic
+5. **Preview learning delta**: If `Bash: scripts/spiral-state.sh learning-delta load` returns JSON, use `depth_calibration` to suggest depth adjustments for any policy and `team_effectiveness` to suggest team configuration or routing changes when `--policy team` or `team+probe`; user decides whether to accept the suggestions
 6. Build Depth Plan:
 
 ```text
@@ -208,7 +260,7 @@ Initialize the spiral state machine for this turn:
 1. Run: `Bash: scripts/spiral-state.sh init "{task}" --policy {policy} --depths "S:{spec_depth} D:{dev_depth} H:{ship_depth} N:{tune_depth}"`
 2. Log: "Spiral state initialized. Policy: {policy}."
 3. State file created at `.swe/active/spiral-state.json`
-4. In tmux sessions, `spiral-monitor.sh` auto-launches in a right-side pane (40% width) showing real-time pipeline and team status. Set `OUROBOROS_NO_MONITOR=1` to disable.
+4. If a previous learning delta was found, write it to `.swe/active/learning-delta.json` so this turn can reuse it during team setup and Tune can overwrite it at the end of the cycle.
 
 If state file already exists (interrupted previous spiral), present options:
 
@@ -231,17 +283,18 @@ When `--policy team`, spawn the specialist team before entering Phase 3. Follow 
 
 System prompts are defined in `references/team-execution-pattern.md` § Specialist System Prompts.
 
-### Bridge Agent Spawn (--route only)
+### Routed Stage Setup (--route only)
 
 When `--route` contains external model assignments (codex):
 
-1. **CLI check**: Verify Codex CLI is available (`which codex` — Bridge Agent will check on startup)
-2. **Spawn Bridge**: `Agent(name: "bridge", subagent_type: "general-purpose", team_name: "{team_name}", model: "sonnet")` with Bridge system prompt from `agents/swe/bridge.md`
-3. **Wait for readiness**: Bridge confirms via SendMessage
-4. **State**: `spiral-state.sh team-update bridge idle`
-5. **Log**: "Bridge Agent spawned for external model routing: {models in routing table}."
+1. **CLI check**: Verify Codex CLI is available with `which codex` and `codex --version`
+2. **Route plan**: Record `mode: direct` unless a migration note explicitly asks for `bridge` or `dual`
+3. **Ownership**: Do not spawn an extra relay agent — Director owns direct relay for routed stages
+4. **State**: Keep routed stages under the owning specialist (`shaper` or `builder`) rather than adding an extra relay specialist
+5. **Log**: "Direct relay ready for routed stages: {models in routing table}."
 
-If no external models in `--route` (all stages → claude): skip Bridge spawn. See `references/team-execution-pattern.md` § Selective Routing Protocol for routing logic and exec fallback.
+If no external models appear in `--route` (all stages → claude), skip routed stage setup.
+See `references/team-execution-pattern.md` § Selective Routing Protocol for routing logic and fallback behavior.
 
 ## Phase 3: Spec
 
@@ -251,6 +304,7 @@ Args: "{task}" --depth {spec_depth}
 ```
 
 Runs Stages 1-4 (Understand → Constrain → Design → Interface). When probe policy is active and spec_depth > Light: follows the Probe Execution Pattern. Otherwise: follows the Composite Execution Pattern. On failure: see Decision Matrix.
+Spec performs Phase 1.5 ambiguity assessment before depth planning and writes `.swe/active/00-ambiguity.md` as a pre-spec side effect.
 
 **When team**: Follows Team Composite Delegation Pattern — Shaper executes Spec, Builder starts codebase pre-analysis (background → `.swe/active/.team/builder-prep.md`).
 
@@ -454,6 +508,17 @@ After archiving, update the living project model with this turn's findings. The 
 2. Read Summary sections from archived artifacts, merge into corresponding project model files (`domain.md`, `constraints.md`, `architecture.md`, `interfaces.md`). Merge is additive (append/update, never remove). Add a Change Log entry and update the `Last updated` header for each modified file.
 3. Skip any stage artifact that doesn't exist in the archive (Light depth may skip some stages)
 
+## Phase 10.7: PA Vault Bridge (Optional)
+
+After archiving and project model update, check if PA module is available for cross-module knowledge capture.
+
+1. Check if `.pa/settings.json` exists via `Glob(".pa/settings.json")`.
+2. If PA module is not detected, skip this phase silently.
+3. If PA module is detected, read the tune report's key decisions and retrospect sections.
+4. Present the bridge proposal per `skills/pa/content-pipeline/references/bridge-contracts.md` (Route 1: SWE → PA).
+5. If user confirms, build the structured summary from archived artifacts and invoke `Skill("ouroboros:pa:ingest")` with the summary text as paste input.
+6. If user declines, skip silently.
+
 ## Phase 11: Team Shutdown (team policy only)
 
 Follow the Shutdown Protocol from `references/team-execution-pattern.md`:
@@ -465,41 +530,10 @@ Follow the Shutdown Protocol from `references/team-execution-pattern.md`:
 
 If a specialist rejects shutdown: wait for its current work to complete, then re-send.
 
-## Decision Matrix
+## Regression Protocol
 
-Consolidated branch conditions across all phases. Regression paths (marked with ↩) use the checkpoint-rewind protocol from `references/spiral-state.md`:
-
-| Phase | Condition | Path A | Path B | Path C |
-|-------|-----------|--------|--------|--------|
-| 1 | Task empty | Abort with usage error | — | — |
-| 1 | Invalid depth/policy | Abort with error | — | — |
-| 1 | `--fast` + `--deep` both present | Abort with error | — | — |
-| 2 | `--depth` provided | Use parsed values | — | — |
-| 2 | No `--depth` | Standard for all composites | — | — |
-| 3 (probe) | Probe result reviewed | Keep Light result → proceed | Escalate to target depth | — |
-| 3 | Spec fails or user aborts | Retry with adjusted depth | Abort spiral | — |
-| 4 | Interface Contracts missing | Run `/swe interface` standalone | Abort spiral | — |
-| 4 | Artifacts present | Auto-proceed (unless user pauses) | — | — |
-| 5 (probe) | Probe result reviewed | Keep Light result → proceed | Escalate to target depth | — |
-| 5 | Dev fails or user aborts | Retry dev | ↩ Return to spec | Abort spiral |
-| 6 | Tests not Green | Run `/swe implement` to fix | Proceed to Ship anyway | Abort spiral |
-| 6 | Tests Green | Proceed to Ship | — | — |
-| 7 (probe) | Probe result reviewed | Keep Light result → proceed | Escalate to target depth | — |
-| 7 | Ship fails or user aborts | Retry ship | ↩ Return to dev | Abort spiral |
-| 8 | P1 findings exist | ↩ Fix P1 + re-run ship | Abort spiral | Override → proceed to Tune |
-| 8 | No P1 findings | Proceed to Tune | — | — |
-| 9 (probe) | Probe result reviewed | Keep Light result → proceed | Escalate to target depth | — |
-| 9 | Tune fails | Log warning, proceed to Phase 10 | — | — |
-| 4.5 (team) | Cross-review P1 finding | ↩ Halt Builder + regress to spec | Continue (late stage) → defer to Tune | — |
-| 4.5 (team) | Cross-review P2/P3 | Record in `.team/` → defer to Tune | — | — |
-| 6.5 (team) | Cross-review P1 finding | ↩ Halt Critic + regress to dev | Continue (late stage) → defer to Tune | — |
-| 6.5 (team) | Cross-review P2/P3 | Record in `.team/` → defer to Tune | — | — |
-| any (team) | Specialist failure | Director executes composite directly (single-agent fallback) | — | — |
-| any (team) | 2+ specialists fail | Fall back to linear/probe policy for remaining composites | — | — |
-| any (team) | Bridge escalation (3 exec failures) | Reassign stage to Claude specialist | — | — |
-| any (team) | Codex CLI unavailable | Fall back to Claude specialist for affected stages | — | — |
-
-### Regression Protocol (↩ paths)
+The consolidated branch conditions live in the early `## Branch Summary`.
+Use this section only for the rewind procedure that applies to the ↩ paths from that summary and from the team execution protocol in `skills/swe/methodology/references/team-execution-pattern.md`.
 
 When the user selects a regression path, execute the checkpoint-rewind protocol:
 
@@ -539,7 +573,6 @@ Proceed with regression?
 - **Analyst agent** (`agents/swe/analyst.md`) — executes specification stages (via `/swe spec`)
 - **Implementer agent** (`agents/swe/implementer.md`) — executes development stages (via `/swe dev`)
 - **Reviewer agent** (`agents/swe/reviewer.md`) — executes ship review stages (via `/swe ship`)
-- **Bridge agent** (`agents/swe/bridge.md`) — delegates stages to external models via exec (team policy + `--route`)
 
 ## Rules
 
@@ -552,6 +585,6 @@ Proceed with regression?
 - Escalation is not regression — does not count toward the circuit breaker limit
 - `--multi` is relayed to Ship and Tune composites — spiral does not perform multi-model operations itself
 - `--route` requires team policy and stage-level execution — ignored with `--fast`, `--composite-level`, or non-team policies
-- `--route` and `--multi` are independent: `--multi` handles evaluation/review relay, `--route` handles stage delegation via Bridge Agent
+- `--route` and `--multi` are independent: `--multi` handles evaluation/review relay, `--route` handles stage delegation via direct relay
 - Specialist failure degrades to single-agent mode for that composite — completed artifacts are preserved
-- Bridge failure (Codex CLI unavailable or 3 consecutive failures) falls back to Claude specialist — no stage is lost
+- Direct relay failure (Codex CLI unavailable or 3 consecutive failures) falls back to Claude specialist — no stage is lost

@@ -1,7 +1,8 @@
 ---
-description: "Reverse — derive Stages 1-4 specification artifacts from existing code"
+name: swe:reverse
+description: "Use when you need to derive requirements, constraints, architecture, and interfaces from existing code"
 argument-hint: "<path> [--scope \"<focus>\"] [--fast] [--depth <global|per-stage>]"
-allowed-tools: Read, Glob, Grep, Write, Task
+allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
 
 # Reverse — Code-First Specification Recovery
@@ -16,24 +17,27 @@ Target: $ARGUMENTS
 |-------|-------|------|
 | 4 | analyst | Procedure 5 — Reverse specification recovery |
 
-## Decision Matrix
+## Branch Summary
 
-All conditional branches and their phase impacts:
-
-| Condition | Phase | Behavior |
-|-----------|-------|----------|
-| `path` empty | 1 | Abort with usage error |
-| `path` nonexistent or no source files | 1 | Abort with path error |
-| `--depth` provided | 2 | Use parsed depth values, skip auto-detection |
-| `--fast` provided (no `--depth`) | 2 | All depths = Light |
-| Neither `--depth` nor `--fast` | 2 | Auto-determine from codebase scale (see Phase 2) |
-| `--scope` provided | 3 | Prioritize scope-matching files in inventory |
-| `.swe/active/` has existing artifacts | 5 | Prompt overwrite confirmation (Y/N) |
-| Overwrite denied (N) | 5 | Abort with scope/archive suggestion |
-| Agent timeout | 4 | Retry once: top 3 modules by file count only |
-| Agent incomplete (<4 artifacts) | 4 | Save completed artifacts, log missing |
-| Agent error | 4 | Abort: suggest narrower `--scope` |
-
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `path` is empty | 1 | Abort with the usage error and do not continue. |
+| `path` does not exist or contains no source files | 1 | Abort with the path error and do not continue. |
+| `--depth` is provided | 2 | Use the parsed global or per-stage depths and skip scale-based auto-detection. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth for all recovered artifacts. |
+| Neither `--depth` nor `--fast` is provided | 2 | Auto-determine depth from codebase scale. |
+| `--scope` is provided | 3 | Prioritize scope-matching files during sampling without excluding out-of-scope inventory context. |
+| Codebase scale is Small | 2, 3 | Read all source files for the reverse packet. |
+| Codebase scale is Medium | 2, 3 | Sample entry points, model files, and API files up to the medium cap. |
+| Codebase scale is Large | 2, 3 | Sample entry points, module boundaries, and API surface files up to the large cap. |
+| Analyst times out | 4 | Retry once with the reduced-scope fallback for the top 3 modules by file count. |
+| Analyst returns fewer than 4 artifacts | 4, 5, 6, 7 | Save completed artifacts, log the missing ones, and present the result as partial. |
+| Analyst errors after retry | 4 | Abort and recommend narrowing `--scope`. |
+| `.swe/active/` already contains artifacts | 5 | Prompt for overwrite confirmation before writing recovered artifacts. |
+| Overwrite is denied | 5 | Abort and recommend archiving or using a narrower scope. |
+| `docs/specs/project/` does not exist and the user approves bootstrap | 5.5 | Initialize the living project model from the recovered artifacts. |
+| `docs/specs/project/` exists and the user approves update | 5.5 | Merge reverse findings into the existing project model. |
+| Project model bootstrap or merge is declined | 5.5 | Skip project-model updates and continue to review/report. |
 ## Phase 1: Parse Input
 
 Extract from $ARGUMENTS:

@@ -24,7 +24,7 @@ Phase 2: Context Gathering
     │
     ├── Fan-Out ──────────────────────────────────────┐
     │                                                  │
-    │   Background: Bash(invoke-model.sh,              │   Foreground: Task(evaluator agent)
+    │   Background: Bash(codex-relay.sh,              │   Foreground: Task(evaluator agent)
     │               run_in_background=true)            │
     │   → writes result to .tmp/{id}_codex_eval.json   │   → returns evaluation report
     │                                                  │
@@ -48,7 +48,7 @@ Construct the relay prompt from Phase 2 data. Save to `.tmp/{SESSION_ID}_relay.t
 **Background branch** — external model via Bash with `run_in_background: true`:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
+bash <plugin-root>/scripts/codex-relay.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
 ```
 
 The background task ID is stored for later collection.

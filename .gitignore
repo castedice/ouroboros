@@ -4,9 +4,17 @@
 .trash/
 .captures/
 .compact-context.md
+.session-context.md
+.claude/agent-memory/
 
 # SWE pipeline artifacts (generated during /swe spiral runs)
 .swe/
+
+# RnD runtime state (generated during /rnd study runs)
+.rnd/
+
+# RnD study outputs (dogfooding artifacts, not production research)
+docs/research/
 
 # OS
 .DS_Store

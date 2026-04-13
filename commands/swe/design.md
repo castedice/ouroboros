@@ -1,5 +1,6 @@
 ---
-description: "Stage 3 — Architecture decisions, algorithm and data structure selection, bounded by constraints (DDD)"
+name: swe:design
+description: "Use when you need to choose an architecture, algorithm, or data shape within known constraints"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <constraint-profile-path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
@@ -35,16 +36,28 @@ Validate `--depth` if provided. If invalid: error and abort.
 
 ## Phase 2: Depth Decision
 
-### Execution Path
+### Branch Summary
 
-| Condition | Path |
-|-----------|------|
-| `--fast` + task fits existing pattern | Skip → minimal artifact → Phase 6 |
-| `--fast` + structural decisions needed | Light |
-| `--depth Skip` + no new components/modules | Skip → minimal artifact → Phase 6 |
-| `--depth Skip` + structural changes required | Override to Light |
-| `--depth` provided (Light/Standard/Deep) | Use directly |
-| No flags | Score via `depth-system.md` |
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| `--fast` is active and the task fits an existing pattern with no new structural decisions | 2, 5, 6 | Take the skip path, write the minimal design artifact, and jump to Phase 6. |
+| `--fast` is active but structural decisions are still required | 2 | Force Light depth and continue with normal analysis. |
+| Explicit `Skip` depth is requested and no new components or modules are introduced | 2, 5, 6 | Take the skip path and write the minimal design artifact. |
+| Explicit `Skip` depth is requested but structural changes are required | 2 | Override Skip to Light and continue with normal analysis. |
+| Neither `--depth` nor `--fast` is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and apply stage-specific triggers. |
+| `--artifact` is provided and readable | 3 | Load the Constraint Profile and use it for traceability checks. |
+| `--artifact` is provided but missing | 3 | Warn and continue without the Constraint Profile. |
+| `.swe/active/01-understand.md` exists | 3 | Load the Context Document at summary-only Light depth or full Standard+ depth. |
+| No Constraint Profile is available from `--artifact` or `.swe/active/02-constrain.md` | 3 | Continue with unconstrained design and warn that traceability will be incomplete. |
+| `docs/specs/project/architecture.md` exists | 4 | Include its `## Summary` in the analyst input packet. |
+| Analyst times out or errors | 4 | Retry once with the Light-depth fallback prompt, then stop and report the failure. |
+| Constraint traceability is missing while a Constraint Profile exists | 4 | Retry once with an explicit traceability requirement. |
+| Standard+ depth returns only one alternative | 4 | Retry once with an explicit minimum of two alternatives. |
+| Command is invoked standalone | 5, 6 | Present the artifact review checkpoint before the final report. |
+| Command is invoked by `/swe spec` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 
 ### Depth Scoring
 
@@ -83,11 +96,14 @@ Delegate architecture design to the analyst agent via Task tool:
 
 ### Recovery
 
-| Failure | Action |
-|---------|--------|
-| Agent timeout/error | Retry once: "Produce a Light-depth Architecture Spec: key design decision + rationale in 3-5 sentences." If retry fails: report error |
-| Missing constraint traceability | Log gap. If Constraint Profile was provided: retry with explicit instruction to add traceability matrix. If no Constraint Profile: accept without traceability but warn in artifact |
-| Single alternative only (Standard+ depth) | Retry with instruction: "Consider at least 2 alternatives with trade-off comparison." |
+Recovery is bounded to 2 analyst attempts total per invocation: the initial run plus 1 retry.
+
+| Failure | Max Retries | Stagnation Detection | Stop Behavior |
+|---------|-------------|----------------------|---------------|
+| Agent timeout or error | 1 | The retry also times out or returns another execution error. | Retry once with the Light-depth fallback prompt, then report failure and do not write an artifact. |
+| Missing constraint traceability while a Constraint Profile exists | 1 | The retry still leaves any design decision without a constraint reference. | Retry once with an explicit Traceability Matrix requirement, then stop and tell the user to repair the constraint inputs first. |
+| Standard+ output contains only one alternative | 1 | The retry still returns only one distinct alternative or no trade-off comparison. | Retry once with an explicit minimum of 2 alternatives, then stop and surface the incompleteness. |
+| Constraint Profile is unavailable | 0 | Stagnation does not apply because missing inputs are not improved by retry. | Continue with a warning, mark traceability as unavailable in the artifact, and recommend `/swe constrain` before downstream stages. |
 
 ## Phase 5: Output
 

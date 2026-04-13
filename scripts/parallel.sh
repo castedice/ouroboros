@@ -130,11 +130,8 @@ action_recover() {
     # Look for tool_result entries that contain the expected file content
     local raw_file="${file}.raw"
     if [[ -f "$raw_file" ]] && [[ -s "$raw_file" ]]; then
-      # Raw file exists — attempt re-parse using invoke-model patterns
-      local parsed
-      parsed=$(jq -s 'map(select(.item?.type? == "agent_message")) | .[-1].item.text // empty' -r "$raw_file" 2>/dev/null || true)
-      if [[ -n "$parsed" ]] && echo "$parsed" | jq -e '.' >/dev/null 2>&1; then
-        echo "$parsed" | jq '.' >"$file"
+      # Raw file exists — attempt re-parse using codex-parse.sh
+      if "$SCRIPT_DIR/codex-parse.sh" "$raw_file" --json "$file" 2>/dev/null; then
         recovered=$((recovered + 1))
         echo "RECOVERED: idx=$idx model=$model from raw file"
         continue

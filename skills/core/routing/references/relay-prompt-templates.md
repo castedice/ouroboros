@@ -202,7 +202,7 @@ Follow this procedure:
 
 - **4-section pattern** (Role, Content, Methodology, Format): Separates concerns cleanly — the model's identity (Section 1), input data (Section 2), analytical procedure (Section 3), and output contract (Section 4) are independent. This makes templates composable: swapping Section 2 content produces a different analysis without changing the methodology.
 - **"Do not assume prior context" in every role**: External models (Codex) have no access to the orchestrator's conversation history. This instruction prevents hallucination of context that doesn't exist in the relay prompt.
-- **JSON-only response format**: Structured output enables automated parsing by `invoke-model.sh` and deterministic cherry-pick merging. Free-text responses would require an additional LLM pass to extract structured data.
+- **JSON-only response format**: Structured output enables automated parsing by `codex-relay.sh` and deterministic cherry-pick merging. Free-text responses would require an additional LLM pass to extract structured data.
 - **Deep variant as extension, not replacement**: The deep variant adds step 6 to the standard methodology rather than defining a separate template. This ensures standard and deep analysis share the same base procedure, reducing maintenance burden and divergence risk.
 - **Verbatim Section 2**: Summarizing source content before relay would lose detail that the external model needs for independent judgment. The cost of larger prompts is justified by higher analysis quality.
 

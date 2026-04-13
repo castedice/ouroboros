@@ -12,8 +12,8 @@ External CLIs produce inconsistent output formats — JSONL with metadata, mixed
 
 | Tier | Handler | Cost | Capability |
 |------|---------|------|------------|
-| 1 — Primary | `invoke-model.sh` (jq) | Zero tokens | Structured JSON extraction |
-| 2 — Fallback | `invoke-model.sh` (alternative jq) | Zero tokens | Alternative extraction paths |
+| 1 — Primary | `codex-relay.sh` (jq) | Zero tokens | Structured JSON extraction |
+| 2 — Fallback | `codex-relay.sh` (alternative jq) | Zero tokens | Alternative extraction paths |
 | 3 — LLM | Command reads raw file | Token cost | Understands arbitrary text structure |
 
 Tier 1-2 run inside the script. Tier 3 runs at the command level — the LLM reads the raw output file and extracts evaluation data using its language understanding.
@@ -21,7 +21,7 @@ Tier 1-2 run inside the script. Tier 3 runs at the command level — the LLM rea
 ## Script Interface
 
 ```text
-scripts/invoke-model.sh <provider> <model> <prompt-file> <output-file>
+scripts/codex-relay.sh <provider> <model> <prompt-file> <output-file>
 ```
 
 | Parameter | Description | Example |
@@ -122,4 +122,4 @@ Cleanup: `rm -f .tmp/{SESSION_ID}_*` at command end.
 
 - **invocation-protocol.md** — Prompt Relay pattern, CLI command syntax
 - **routing-table.md** — Task category × stake level → model selection
-- **invoke-model.sh** (`scripts/`) — Script implementation of Tier 1-2
+- **codex-relay.sh** (`scripts/`) — Script implementation of Tier 1-2

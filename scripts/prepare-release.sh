@@ -73,6 +73,10 @@ cp "$PLUGIN_ROOT/.rumdl.toml" "$TARGET/"
 cp "$PLUGIN_ROOT/.shellcheckrc" "$TARGET/"
 cp "$PLUGIN_ROOT/AGENTS.md" "$TARGET/"
 
+# Sanitize references to internal dev docs not included in release
+echo "Sanitizing internal references..."
+find "$TARGET" -name "*.md" -not -path "*/.git/*" -not -path "*/dev/*" -not -name "CHANGELOG.md" | xargs sed -i '' -E '/dev\/(PA-DESIGN|RND-DESIGN|HANDOVER|REVIEW|references\/resource-analysis)[^)]*\.md/d'
+
 # Dev docs — operational documents referenced by CLAUDE.md, AGENTS.md, hooks, and commands
 mkdir -p "$TARGET/dev"
 cp "$PLUGIN_ROOT/dev/VISION.md" "$TARGET/dev/"
@@ -91,8 +95,8 @@ Describe current project state here.
 
 - [ ] ...
 STATUSEOF
-cat >"$TARGET/dev/PLAN.md" <<'PLANEOF'
-# Ouroboros — Development Plan
+cat >"$TARGET/dev/MILESTONES.md" <<'PLANEOF'
+# Ouroboros — Milestones
 
 ## Current Version
 
@@ -106,11 +110,16 @@ PLANEOF
 # Curated public documentation
 mkdir -p "$TARGET/docs"
 cp "$PLUGIN_ROOT/docs/ROADMAP.md" "$TARGET/docs/"
+for guide in GUIDE.md ARCHITECTURE.md; do
+  [[ -f "$PLUGIN_ROOT/docs/$guide" ]] && cp "$PLUGIN_ROOT/docs/$guide" "$TARGET/docs/"
+done
 
 # Design documents
 if [[ -d "$PLUGIN_ROOT/docs/designs" ]]; then
   mkdir -p "$TARGET/docs/designs"
-  cp "$PLUGIN_ROOT/docs/designs/v0.15.0-spiral-analysis.md" "$TARGET/docs/designs/" 2>/dev/null || true
+  for f in "$PLUGIN_ROOT"/docs/designs/*.md; do
+    [[ -f "$f" ]] && cp "$f" "$TARGET/docs/designs/"
+  done
 fi
 
 # Experiment analysis reports (refined for public release)
@@ -123,7 +132,7 @@ done
 
 # Final evaluation baselines (latest only)
 mkdir -p "$TARGET/docs/evaluations"
-for pattern in core-014 swe-008; do
+for pattern in core-018 swe-012 pa-015; do
   for f in "$PLUGIN_ROOT"/dev/evaluations/${pattern}-*.json; do
     [[ -f "$f" ]] && cp "$f" "$TARGET/docs/evaluations/"
   done
@@ -143,7 +152,7 @@ echo "  Scripts:  $(find "$TARGET/scripts" -name "*.sh" | wc -l | tr -d ' ')"
 echo ""
 echo "Documentation:"
 echo "  README.md, CLAUDE.md, AGENTS.md, LICENSE"
-echo "  dev/VISION.md, dev/DECISIONS.md, dev/STATUS.md (template), dev/PLAN.md (template)"
+echo "  dev/VISION.md, dev/DECISIONS.md, dev/STATUS.md (template), dev/MILESTONES.md (template)"
 echo "  docs/ROADMAP.md"
 if [[ -d "$TARGET/docs/designs" ]]; then
   echo "  docs/designs/: $(find "$TARGET/docs/designs" -name "*.md" | wc -l | tr -d ' ') design docs"
@@ -197,9 +206,9 @@ else
 fi
 
 # 4. Internal dev file leak check
-# dev/VISION.md, dev/DECISIONS.md, dev/STATUS.md, dev/PLAN.md are intentionally included
+# dev/VISION.md, dev/DECISIONS.md, dev/STATUS.md, dev/MILESTONES.md are intentionally included
 # Check for files that should NOT be in the release
-LEAKED_DEV=$(find "$TARGET/dev" -not -path "*/.git/*" -name "*.md" 2>/dev/null | grep -v -E '(VISION|DECISIONS|STATUS|PLAN)\.md$' || true)
+LEAKED_DEV=$(find "$TARGET/dev" -not -path "*/.git/*" -name "*.md" 2>/dev/null | grep -v -E '(VISION|DECISIONS|STATUS|MILESTONES)\.md$' || true)
 if [[ -n "$LEAKED_DEV" ]]; then
   echo "FAIL: Unexpected dev files in release:"
   echo "$LEAKED_DEV" | sed 's/^/  /'
@@ -232,6 +241,15 @@ if [[ -n "$ABS_IN_HOOKS" ]]; then
   AUDIT_FAIL=1
 else
   echo "PASS: Hooks use portable paths"
+fi
+
+# 7. Broken dev references in non-historical files
+BROKEN_DEV_REFS=$(grep -rn --include="*.md" -E 'dev/(PA-DESIGN|RND-DESIGN|HANDOVER|REVIEW)\.md' "$TARGET" 2>/dev/null | grep -v '.git/' | grep -v 'dev/DECISIONS.md' | grep -v 'CHANGELOG.md' || true)
+if [[ -n "$BROKEN_DEV_REFS" ]]; then
+  echo "WARN: References to excluded dev docs:"
+  echo "$BROKEN_DEV_REFS" | sed 's/^/  /'
+else
+  echo "PASS: No broken dev doc references"
 fi
 
 echo ""

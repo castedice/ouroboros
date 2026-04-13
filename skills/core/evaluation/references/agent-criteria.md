@@ -56,12 +56,12 @@ Is every workflow step actionable without ambiguity?
 - **1**: Each step specifies concrete action (read X, compare Y with Z, produce format W). Conditional branches have explicit conditions. No "analyze appropriately" type steps
 - **0**: Contains vague steps ("adjust as needed"), conditional branches without clear conditions, or references to undefined concepts
 
-### Q3: Output Format Specification
+### Q3: Output Format And Terminal Status Contract
 
-Is the expected output format concretely defined?
+Is the expected output format and completion-status behavior concretely defined?
 
-- **1**: Output defined as template, markdown structure, or structured schema with section headers/field names. Consumer can predict what they'll receive
-- **0**: Output described only as "produce a report" or "provide analysis" without structural specification
+- **1**: Output is defined as a template, markdown structure, or structured schema with section headers or field names. Unless the agent is explicitly JSON-only, final responses must append the terminal block from `skills/core/routing/references/completion-status-protocol.md`. JSON-only agents explicitly state that the block is omitted to preserve machine-parseable raw JSON
+- **0**: Output shape is vague, or the completion-status rule and JSON-only exception are missing
 
 ### Q4: Scope Boundary Clarity
 
@@ -111,8 +111,8 @@ Is the prompt token-efficient without sacrificing clarity?
 
 Does the agent document its place in the larger system?
 
-- **1**: Mentions which commands invoke it, how it receives input, how output is consumed. Relationship with related agents/skills/templates documented
-- **0**: Described as standalone. No mention of callers, consumers, or peer components
+- **1**: Mentions which commands invoke it, how it receives input, how output is consumed, and how callers consume or strip completion-status metadata when relevant. Relationship with related agents, skills, and templates is documented
+- **0**: Described as standalone. No mention of callers, consumers, peer components, or status-metadata handling
 
 ### E4: Calibration Anchors
 

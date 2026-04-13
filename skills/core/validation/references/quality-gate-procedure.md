@@ -27,6 +27,8 @@ For each generated command, agent, and skill:
    - Instructions: "Load criteria reference for this component type. Apply tiered criteria (F→Q→E) with CoT-first scoring and severity gate. Return evaluation report with level."
 3. Record the level
 
+Before extracting levels or improvement details from evaluator output, strip the trailing completion status block from `skills/core/routing/references/completion-status-protocol.md` if present.
+
 ### Step 2: Quality Gate Check
 
 - **Pass threshold**: Level ≥ 2 (Needs Work) per component — Foundation must be complete
@@ -57,6 +59,8 @@ For each failing component:
    - Instructions: "Perform Component Regeneration. Parse evaluation feedback, diagnose root causes, produce revised content."
 2. Overwrite the file in worktree with revised content
 3. Re-evaluate with **evaluator** agent
+
+Before extracting revised content from generator output, strip the trailing completion status block from `skills/core/routing/references/completion-status-protocol.md` if present.
 
 ### Step 4: Post-Retry Decision
 

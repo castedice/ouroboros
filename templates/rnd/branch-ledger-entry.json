@@ -1,0 +1,24 @@
+{
+  "entry_kind": "prune",
+  "branch_id": "br-001",
+  "wave_id": "wave-001",
+  "scores": {
+    "B1": 0,
+    "B2": 0,
+    "B3": 0,
+    "B4": 0
+  },
+  "composite": 0,
+  "decision": "prune",
+  "reason": "",
+  "evidence_refs": [],
+  "budget_spent": {
+    "probe_calls": 0,
+    "web_search_calls": 0,
+    "web_fetch_calls": 0,
+    "wall_clock_seconds": 0
+  },
+  "merge_target": null,
+  "expand_contracts": [],
+  "decided_at": ""
+}

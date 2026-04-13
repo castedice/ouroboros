@@ -1,5 +1,6 @@
 ---
-description: Explore ouroboros capabilities — discover installed modules, list available commands, and recommend workflows
+name: core:onboard
+description: "Use when you need to understand installed ouroboros capabilities and find the right command for a task"
 argument-hint: [<topic>]
 allowed-tools: Read, Glob, Grep, Task
 ---
@@ -35,6 +36,20 @@ Extract arguments from $ARGUMENTS:
 
 - `Glob: commands/*/{topic}.md`
 - If no match → suggest closest matches from available commands, then fall back to overview mode
+
+## Branch Summary
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| `topic` | omitted | 2, 3, 4 | Run Overview mode, including Phase 3 workflow analysis |
+| `topic` | matches an installed command | 2, 4 | Run Detail mode and skip Phase 3 |
+| `topic` | does not match any command | 1, 4 | Suggest closest matches and fall back to Overview mode |
+| Plugin structure | `commands/` missing or empty | 2, 4 | Skip normal registry build and render the recovery diagnostic |
+| Frontmatter parse | succeeds | 2 | Include the component in the discovery registry |
+| Frontmatter parse | fails | 2, 4 | Skip the file, note partial results, and continue discovery |
+| Researcher workflow analysis | succeeds | 3, 4 | Render context-aware workflow recommendations |
+| Researcher workflow analysis | fails or is incomplete | 3, 4 | Fall back to static workflow suggestions |
+| Detail command file | inaccessible | 2, 4 | Report partial detail output and recommend rerunning after fixing file access |
 
 ## Phase 2: Module Discovery
 
@@ -131,6 +146,25 @@ Delegate workflow recommendation to the researcher agent via Task tool:
 - **Staying Current**: `/upgrade --check` → `/upgrade` → `/evaluate`
 - **Project Integration**: `/adopt <project-path>` → `/onboard`
 
+### Claude Code Defaults
+
+- **Auto mode**: Ouroboros project settings already set `permissions.defaultMode` to `auto` in `.claude/settings.json`
+- **What auto mode does**: Explicit `allow`, `deny`, and `ask` rules still apply first, and Claude Code's classifier decides the remaining actions
+- **Shared-safe rules**: Ouroboros keeps narrow shared permission patterns so they continue to work in auto mode
+
+### Voice Dictation
+
+- **Requirements**: Sign in with a Claude.ai account and grant local microphone access
+- **Enable it**: Run `/voice` or set `"voiceEnabled": true` in `~/.claude/settings.json`
+- **Push to talk**: Hold `Space` to record by default
+- **Languages**: Voice dictation supports 20 languages and follows Claude Code's `language` setting
+
+### Persistent Plugin Data
+
+- **Path**: `${CLAUDE_PLUGIN_DATA}` resolves to `~/.claude/plugins/data/{plugin-id}/`
+- **Lifecycle**: Claude Code creates this directory automatically and keeps it across plugin updates
+- **Use it for**: Persistent plugin-owned state such as analytics, caches, or learned patterns that should not live in the repository
+
 ### Next Steps
 
 {Insert researcher's context-aware suggestions from Phase 3, or generate from discovery results:}
@@ -181,6 +215,24 @@ Read the full command file and present structured details:
 - `/evolve commands/{module}/{command-name}.md` — improve weakest area
 - `/onboard {related-command}` — explore related command
 ```
+
+After presenting either Overview or Detail mode, make one explicit recommendation and stop:
+
+```text
+Based on your goal, I recommend: {command suggestion}. Proceed with this command?
+```
+
+Wait for the user's response instead of inferring the next command.
+
+## System Integration
+
+| Aspect | Contract |
+|--------|----------|
+| Discovery inputs | Read `commands/*/`, `agents/*/`, `skills/*/`, and `templates/*/` plus frontmatter fields defined in `skills/core/validation/references/frontmatter-and-fields.md` |
+| Produced artifact | An in-memory discovery registry only. `/onboard` does not persist files, temp payloads, or decision entries |
+| Command-taxonomy boundary | `/onboard` catalogs installed capabilities and recommends next commands. It does not evaluate quality (`/evaluate`), modify files (`/adopt`, `/evolve`, `/generate`), or inspect external sources (`/research`) |
+| Downstream consumers | Users can jump from the rendered registry to `/evaluate`, `/evolve`, `/adopt`, `/upgrade`, or other listed commands using the exact paths and names surfaced here |
+| Registry scope | Only installed local components are included. Missing or external modules stay outside `/onboard` until they exist on disk |
 
 ## Rules
 

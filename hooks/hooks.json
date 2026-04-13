@@ -12,6 +12,17 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Read",
+        "description": "Deny reads of authored vault content when deny-paths.json is configured — redirect to shadow vault",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pa-read-guard.sh",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -27,6 +38,20 @@
         ]
       }
     ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "description": "Append privacy-safe tool failure friction events to the learning pipeline source log",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/learning-log-tool-failure.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",
@@ -36,6 +61,32 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "description": "Append lightweight session-end learning patterns for unfinished promises and missing final artifacts",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/learning-session-end.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "description": "Enqueue the finished Claude transcript and subagent transcripts for session archive sync",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/session-archive-ingest.sh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -75,6 +126,19 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/choice-log.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "ouroboros:",
+        "description": "Inject project-local calibration memory and active Ralph promises into ouroboros subagents",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/agent-memory-context.sh",
             "timeout": 5
           }
         ]

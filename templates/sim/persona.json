@@ -1,0 +1,15 @@
+{
+  "id": "string",
+  "name": "string",
+  "traits": {
+    "key": "value pairs - Big Five, goals, constraints, risk profile"
+  },
+  "private_info": "string - information only this agent sees",
+  "goals": [
+    "string array"
+  ],
+  "constraints": [
+    "string array - behavioral rules"
+  ],
+  "initial_resources": {}
+}

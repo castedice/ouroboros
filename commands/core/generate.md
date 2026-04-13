@@ -1,7 +1,8 @@
 ---
-description: Create a new plugin module or add a component to an existing module — design, generate, validate quality, and scaffold into the codebase
+name: core:generate
+description: "Use when you need to create a new plugin module or add a new component to an existing module"
 argument-hint: <module-name> "<description>" | <module>/<component-name> "<description>" [--type <command|agent|skill|template>] [--reference <module>] [--single]
-allowed-tools: Read, Glob, Grep, Write, Bash, Task
+allowed-tools: Read, Glob, Write, Edit, Bash, Task
 ---
 
 # Generate — Module & Component Creation
@@ -17,6 +18,47 @@ Target: $ARGUMENTS
 | 3 | generator + Bash background (--multi) | Module spec (Procedure 1, Mode A) or component spec (Procedure 3, Mode B); parallel with Codex when --multi |
 | 5.5 | — (command) | Structural validation + inter-component consistency + auto-fix |
 | 6 | evaluator, generator + Bash background (--multi) | Quality gate — validate + retry. See [procedure reference](../../skills/core/validation/references/quality-gate-procedure.md) |
+
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass artifact paths and inline reference contents on every agent call.
+Use named return payloads rather than prose-only summaries.
+The command owns all worktree writes, manifest persistence, and quality-gate state.
+Internal agent calls use `Agent(subagent_type: "ouroboros:core:{agent}")`.
+The Bash Codex relay path is additive evidence only.
+
+| Invocation | Input | Instructions | Expected Output |
+|------------|-------|--------------|-----------------|
+| Phase 3 generator, Mode A | Module spec from Phase 1, Phase 2 target analysis, relevant knowledge entries, reference module patterns, `skills/core/evaluation/references/command-criteria.md`, `skills/core/evaluation/references/agent-criteria.md`, `skills/core/evaluation/references/skill-criteria.md`, and `templates/core/module-scaffold.md` | Apply `agents/core/generator.md` Procedure 1 and `skills/core/generation/SKILL.md`. Design a module that matches the reference patterns and emit machine-consumable JSON only. | JSON object with `manifest`, `rationale`, `files`, and `readme`. `manifest` lists `path`, `type`, and `description` for every generated file, and `files` carries the full contents keyed by `path`. |
+| Phase 3 generator, Mode B | Component spec from Phase 1, full target-module context, same-type reference components, relevant knowledge entries, and `skills/core/evaluation/references/{type}-criteria.md` | Apply `agents/core/generator.md` Procedure 3 and `skills/core/generation/SKILL.md`. Match the existing module conventions and emit machine-consumable JSON only. | JSON object with `path`, `type`, `rationale`, and `content`. `path` must match the final repository location. |
+| Phase 6 evaluator | Generated component content from the worktree, detected component type, structural-validation findings from Phase 5.5, and the matching criteria reference under `skills/core/evaluation/references/` | Apply the quality gate from `skills/core/validation/references/quality-gate-procedure.md` plus the static evaluation method in `commands/core/evaluate.md` Phase 3. Score the component against the criteria, keep reasoning evidence-based, and return a machine-consumable evaluation result. | Evaluation payload with overall level, per-tier scores, per-criterion judgments, and the pass or fail verdict for the Level >= 2 gate. |
+| Phase 6 retry generator | Failed component content, evaluator findings, the failing criterion IDs, and the same generation references used in Phase 3 | Apply `agents/core/generator.md` for targeted regeneration only. Preserve passing structure and address the cited criteria without broad redesign. | Replacement component content plus a brief rationale naming the repaired criteria IDs. |
+
+Before machine-parsing any generator or evaluator payload, strip the trailing status block per `skills/core/routing/references/completion-status-protocol.md`.
+
+## Shared Procedures & Payload Contracts
+
+| Artifact | Path | Role |
+|----------|------|------|
+| Relay assembly guide | `skills/core/external-models/references/relay-assembly.md` | Four-section external-model relay contract for Phase 3 |
+| Scaffold and quality gate | `skills/core/generation/references/scaffold-and-quality-gate.md` | Minimum-viable module rule, scaffold-first generation, and pre-quality checks |
+| Regeneration loop | `skills/core/generation/references/regeneration-loop.md` | Shared retry boundaries after quality-gate failures |
+| Validation check matrix | `skills/core/validation/references/validation-check-matrix.md` | Cross-cutting structural and relationship checks for Phase 5.5 |
+
+Machine-consumed payloads:
+- Phase 3 relay prompt writes `.tmp/{SESSION_ID}_generator_relay.txt`.
+- Phase 3 Claude generation writes `.tmp/{SESSION_ID}_claude_gen.json`.
+- Phase 3 Codex generation writes `.tmp/{SESSION_ID}_codex_gen.json`.
+- Phase 5.5 structural validation writes `.tmp/{SESSION_ID}_structural_validation.md`.
+- Phase 6 quality-gate verdicts write `.tmp/{SESSION_ID}_quality_gate_{slug}.json`.
+
+Status-handling and parse rules:
+- Strip any trailing completion status block before parsing a generator or evaluator summary.
+- When both a summary and an on-disk JSON payload exist, the JSON payload is authoritative.
+- Mode A parses `manifest`, `files`, and `readme` from the authoritative payload.
+- Mode B parses `path`, `type`, and `content` from the authoritative payload.
+
 
 ## Phase 1: Parse Input
 
@@ -37,6 +79,27 @@ Extract arguments from $ARGUMENTS:
 | `--capabilities` | Mode A only | Comma-separated list of desired capabilities |
 | `--reference` | No | Reference module to pattern-match (default: `core`) |
 | `--single` | No | Force single-model mode (skip external CLIs). By default, multi-model is auto-detected — if codex CLI is installed, Codex runs in parallel for generation (Phase 3) and evaluation (Phase 6) |
+
+### Branch Summary
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| Target | `<module-name>` and module absent | 1-9 | Mode A module generation |
+| Target | `<module>/<component-name>` and module present | 1-9 | Mode B component generation |
+| Target | `<module-name>` but module already exists | 1 abort | Error and suggest `/evolve` or Mode B |
+| Target | `<module>/<component-name>` but the module is missing or the component already exists | 1 abort | Error and stop |
+| Description | missing or empty | 1 abort | Usage error and stop |
+| `--type` | provided in Mode B | 1-3 | Use the explicit component type |
+| `--type` | omitted in Mode B | 1 | Infer from description and default to `command` on ambiguity |
+| `--reference` | provided | 2 | Read patterns from the selected reference module |
+| `--reference` | omitted | 2 | Default to `core` as the reference module |
+| `--single` | true | 3, 6 | Claude-only generation and quality validation |
+| `--single` | false (default) + Codex available | 3, 6 | Parallel Claude + Codex generation and evaluation |
+| `--single` | false (default) + Codex unavailable | 3, 6 | Claude-only fallback with no external merge step |
+| Existing worktree | found | 4 | User chooses Resume, Discard, or Merge before file writes |
+| Plan approval | adjusted or declined | 3.5 | Revise the plan before entering the worktree |
+| Structural validation | residual errors remain after auto-fix | 5.5, 6, 8, 9 | Continue to the quality gate and surface the residual issues in review and report |
+
 
 ### Mode Detection
 
@@ -115,86 +178,40 @@ Generation runs Claude generator for deep knowledge-base-integrated content crea
 
 **IMPORTANT**: The generator agent is read-only. All file writes happen in Phase 5 by the command orchestrator — the generator outputs text content only.
 
-### When `--multi` is active (parallel):
+### Relay Assembly
 
-1. **Build generator relay prompt**: Construct from Phase 2 context + generation instructions. Save to `.tmp/{SESSION_ID}_generator_relay.txt`
+Assemble `.tmp/{SESSION_ID}_generator_relay.txt` using the four-section contract in `skills/core/external-models/references/relay-assembly.md`.
+Use the section-source matrix below instead of restating the relay body inline.
 
-   **Section 1 — Role** (fixed template):
+| Section | Source |
+|---------|--------|
+| Role | Fixed generator role from `relay-assembly.md` |
+| Content | Phase 2 context. Mode A uses module spec, reference patterns, knowledge entries, and scaffold template. Mode B uses component spec, target-module context, same-type references, and knowledge entries |
+| Methodology or Criteria | `skills/core/generation/SKILL.md`, `skills/core/generation/references/scaffold-and-quality-gate.md`, and the criteria files loaded in Phase 2c |
+| Response Format | The matching JSON contract from the Delegation Contracts table above |
 
-   ```text
-   You are an independent plugin component generator. Your task is to design and generate plugin components based on the specification, reference patterns, and criteria provided below. Produce complete, production-ready component content. Do not assume any prior context — generate based solely on the inputs given.
-   ```
+### Execution Matrix
 
-   **Section 2 — Content**: All Phase 2 context verbatim:
+| Execution Mode | Generator Runs | Authoritative Payload | Merge Behavior |
+|----------------|----------------|-----------------------|----------------|
+| `--multi` active | Claude generator task + Codex relay | `.tmp/{SESSION_ID}_claude_gen.json` unless the orchestrator promotes cherry-picked Codex additions into the final merged payload | Keep Claude structure primary and cherry-pick Codex sections only when they improve criteria coverage, completeness, or integration fit |
+| Single-model | Claude generator task only | `.tmp/{SESSION_ID}_claude_gen.json` | Use the Claude payload directly |
 
-   | Mode | Content |
-   |------|---------|
-   | A | Module spec (name, description, capabilities) + reference module patterns + relevant knowledge entries + scaffold template |
-   | B | Component spec (module, name, description, type) + existing module components + same-type reference components + relevant knowledge entries |
+When `--multi` is active, launch Codex via `scripts/codex-relay.sh .tmp/{SESSION_ID}_generator_relay.txt --output .tmp/{SESSION_ID}_codex_gen.json --effort high` and launch Claude via Task tool, writing `.tmp/{SESSION_ID}_claude_gen.json`.
+When single-model is active, launch only the Claude generator and write `.tmp/{SESSION_ID}_claude_gen.json`.
+Mode A uses the Procedure 1 contract from the Delegation Contracts table.
+Mode B uses the Procedure 3 contract from the same table and repeats once per actionable gap.
+After collection, parse the authoritative payload and build the unified manifest for Phase 5.
 
-   **Section 3 — Criteria**: Raw criteria reference content (`skills/core/evaluation/references/{type}-criteria.md`, verbatim). For Mode A, include all applicable criteria (command, agent, skill).
+### Phase 3.5: Plan Approval
 
-   **Section 4 — Instructions + Response Format**:
+Present the generation plan:
 
-   Mode A:
+```text
+Generating {n} components for {module}: {component list}. Proceed with generation?
+```
 
-   ```text
-   Generate a complete plugin module with the following structure. Analyze the reference patterns, then design and generate all component file contents.
-
-   Respond ONLY with a JSON object (no markdown, no explanation outside JSON):
-   {
-     "manifest": [
-       { "path": "commands/{module}/{name}.md", "type": "command", "description": "what this component does" }
-     ],
-     "rationale": "architectural decisions and design reasoning",
-     "files": [
-       { "path": "commands/{module}/{name}.md", "content": "full file content" }
-     ],
-     "readme": "module README content"
-   }
-   ```
-
-   Mode B:
-
-   ```text
-   Generate a single plugin component that integrates seamlessly with the existing module. Analyze the existing module patterns and reference components, then generate the component content.
-
-   Respond ONLY with a JSON object (no markdown, no explanation outside JSON):
-   {
-     "path": "{type-directory}/{module}/{name}.md",
-     "type": "command|agent|skill|template",
-     "rationale": "design decisions and integration reasoning",
-     "content": "full file content"
-   }
-   ```
-
-2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_generator_relay.txt .tmp/{SESSION_ID}_codex_gen.json high, run_in_background=true)`
-   - **Foreground**: Launch Claude **generator** agent (via Task tool) with all Phase 2 context
-
-3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
-
-4. **Cherry-pick merge**: Review both generation outputs and build the final component content:
-   - Use Claude's output as the primary structure (Claude has full knowledge base context)
-   - Cherry-pick from Codex output: sections with stronger criteria coverage, novel patterns, or better structural completeness
-   - If Codex generated content that addresses criteria Claude missed, incorporate it
-   - If Codex generation failed or is partial, proceed with Claude-only output
-   - The merged content feeds into Phase 5 (Write Files) — the orchestrator writes the final files
-
-### When `--multi` is not active (single-model):
-
-Launch the **generator** agent via Task tool with all context gathered in Phase 2:
-
-| | Mode A (Procedure 1) | Mode B (Procedure 3) |
-|---|---|---|
-| **Input** | Module spec (name, domain, capabilities) + reference module patterns + knowledge entries + criteria + scaffold template | Component spec (module, name, description, type) + existing module components + same-type reference components + knowledge entries + criteria |
-| **Instructions** | "Perform Module Generation (Procedure 1). Analyze reference patterns, design module architecture, generate all component file contents. Output a complete Module Spec with manifest, rationale, and file contents." | "Perform Component Generation (Procedure 3). Analyze existing module patterns, generate a single component that integrates seamlessly. Output a Component Spec with path, rationale, and file content." |
-| **Expected output** | Module Spec (manifest + rationale + all file contents) | Component Spec (path + rationale + file content) |
-
-Parse the output:
-
-- **Mode A**: Extract component manifest, each file's content, and Module README content
-- **Mode B**: Extract the file path and file content
+Wait for user confirmation before writing any files.
 
 ## Phase 4: Worktree Setup
 
@@ -271,28 +288,18 @@ Log: "1 file written to worktree: {component-path}"
 
 > Validates generated files for structural correctness and inter-component consistency before quality evaluation.
 
-Apply the validation-methodology skill (`skills/core/validation/SKILL.md`) to each file written in Phase 5:
+Apply the shared pre-quality procedure from `skills/core/generation/references/scaffold-and-quality-gate.md` plus `skills/core/validation/SKILL.md`.
+Record the aggregated findings in `.tmp/{SESSION_ID}_structural_validation.md` for Phase 6 and Phase 8.
 
-### Step 1: Type-Specific Validation
+### Validation Procedure
 
-For each generated file in the worktree, run the validation workflow (Steps 1-4):
-
-1. **Identify component type** from file location and frontmatter
-2. **Run type-specific checks** per `skills/core/validation/references/frontmatter-and-fields.md`
-3. **Run cross-cutting checks** per `skills/core/validation/references/naming-and-collision.md`
-4. **Check common pitfalls** per `skills/core/validation/references/common-pitfalls.md`
-
-### Step 2: Inter-Component Consistency
-
-Validate references between generated components and existing module components:
-
-| Check | Condition | Validation |
-|-------|-----------|------------|
-| Agent → Skill reference | Agent was generated or exists in module | Agent's Read instructions or procedure steps reference the correct skill path (`skills/{module}/{skill-name}.md`) |
-| Command → Agent invocation | Command was generated or exists in module | Command's agent delegation uses the correct agent name matching `agents/{module}/{agent-name}.md` |
-| Skill → Reference files | Skill was generated | All files listed in skill's `references/` directory paths exist (or are being generated in the same batch) |
-
-For each failed check: log as error with the specific mismatched reference and expected value.
+| Substep | Reference | Behavior |
+|---------|-----------|----------|
+| Type-specific validation | `skills/core/validation/SKILL.md` Steps 1-4 plus `frontmatter-and-fields.md` | Validate each generated file's frontmatter, required sections, and type-specific structure |
+| Cross-cutting validation | `skills/core/validation/references/naming-and-collision.md` and `common-pitfalls.md` | Check naming, path constraints, collisions, and common command or agent issues |
+| Inter-component consistency | `skills/core/generation/references/scaffold-and-quality-gate.md` plus `validation-check-matrix.md` | Verify Agent → Skill, Command → Agent, and Skill → Reference path integrity across generated and existing components |
+| Auto-fix pass | Bounded by the error-type table below | Apply only the listed safe fixes with Edit tool |
+| Re-validation | Same references as above | Re-run only the affected checks when auto-fixes were applied |
 
 ### Step 3: Auto-Fix Errors
 
@@ -311,7 +318,7 @@ Errors not in this table: log as warning, do not attempt fix.
 
 ### Step 4: Re-Validate (if fixes applied)
 
-If any auto-fixes were applied in Step 3, re-run validation (Steps 1-2) on the fixed files to confirm resolution. Skip if no fixes were applied.
+If any auto-fixes were applied in Step 3, re-run the Validation Procedure checks touched by those edits. Skip if no fixes were applied.
 
 ### Step 5: Report
 
@@ -330,7 +337,7 @@ For each generated command, agent, and skill (templates excluded):
 
 1. **Build relay prompt**: Construct Mode A static evaluation prompt from component content + criteria reference. Save to `.tmp/{SESSION_ID}_relay.txt`
 2. **Fan-out** (parallel):
-   - **Background**: `Bash(invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh, run_in_background=true)`
+   - **Background**: `Bash(codex-relay.sh .tmp/{SESSION_ID}_relay.txt --output .tmp/{SESSION_ID}_codex_eval.json --effort xhigh, run_in_background=true)`
    - **Foreground**: Launch Claude **evaluator** agent (via Task tool) for static evaluation
 3. **Fan-in**: Collect Codex result after Claude completes. Handle exit codes per `evaluate.md` Phase 3.5 Step 3
 4. **Consensus**: Apply per-criterion majority rule (same as `evaluate.md` Phase 5.5). Consensus score determines pass/fail

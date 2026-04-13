@@ -1,0 +1,73 @@
+{
+  "name": "Stock Market Simulation",
+  "description": "N traders with different information and strategies",
+  "ticks": 10,
+  "personas": [
+    {
+      "id": "trader-1",
+      "name": "Conservative Investor",
+      "traits": {
+        "risk_tolerance": "low",
+        "strategy": "value"
+      },
+      "private_info": "Has a long-term thesis and cares about downside risk.",
+      "goals": [
+        "preserve capital"
+      ],
+      "constraints": [
+        "Avoid trades larger than the max_trade_pct rule"
+      ],
+      "initial_resources": {
+        "cash": 10000,
+        "shares": 0
+      }
+    },
+    {
+      "id": "trader-2",
+      "name": "Day Trader",
+      "traits": {
+        "risk_tolerance": "high",
+        "strategy": "momentum"
+      },
+      "private_info": "Tracks short-term momentum and reacts quickly to news.",
+      "goals": [
+        "maximize short-term gains"
+      ],
+      "constraints": [
+        "Avoid holding positions after the final tick"
+      ],
+      "initial_resources": {
+        "cash": 10000,
+        "shares": 0
+      }
+    }
+  ],
+  "shared_state": {
+    "market": {
+      "price": 100,
+      "volume": 1000,
+      "trend": "neutral"
+    }
+  },
+  "events": [
+    {
+      "tick": 3,
+      "type": "news",
+      "content": "Company reports earnings beat",
+      "visibility": "all"
+    },
+    {
+      "tick": 5,
+      "type": "insider",
+      "content": "CEO selling shares",
+      "visibility": [
+        "trader-1"
+      ]
+    }
+  ],
+  "rules": {
+    "max_trade_pct": 0.1,
+    "transaction_cost": 0.001,
+    "state_delta_policy": "append-only"
+  }
+}

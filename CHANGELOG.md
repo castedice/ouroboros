@@ -48,7 +48,7 @@ Public release.
 - README.md: updated for v1.0.0 — new commands (`/doctor`, `/swe reverse`), traversal policies, bridge agent, Living Project Model, architecture tree
 - `plugin.json` version: 0.18.5 → 1.0.0
 - `prepare-release.sh`: added AGENTS.md to copy list and required files
-- `dev/PLAN.md`: v1.0.0 items completed, Future Versions expanded with new ideas (heartbeat, mobile, messenger)
+- `dev/MILESTONES.md`: v1.0.0 items completed, Future Versions expanded with new ideas (heartbeat, mobile, messenger)
 
 ## [0.19.5] — 2026-03-11
 
@@ -387,7 +387,7 @@ Component quality: full evaluation baseline across 37 components, selective poli
 - `routing/SKILL.md`: added inline routing table key defaults (E3), added Consumers section listing 4 consuming commands (E4)
 - `adopt.md`: added Recovery sections for researcher/generator agent failures (Q7), extracted detection patterns to `templates/core/project-detection-patterns.md` (E1), simplified Phase 1 validation to reference Branch Summary (E2)
 - `onboard.md`: added researcher agent delegation for workflow recommendations (F2), restructured Recovery as table with retry/escalation (Q7)
-- `dev/PLAN.md` v0.10.0 items: replaced ad-hoc items with systematic full-sweep evaluation + selective polish plan
+- `dev/MILESTONES.md` v0.10.0 items: replaced ad-hoc items with systematic full-sweep evaluation + selective polish plan
 
 ## [0.9.0] — 2026-02-27
 

@@ -1,5 +1,6 @@
 ---
-description: Absorb external sources into the modular monolith — orchestrate Research + Evaluate + Generate/Evolve to transform external patterns into internal modules or components
+name: core:absorb
+description: "Use when you need to turn external sources into new or updated plugin modules or components"
 argument-hint: <path|url|topic> [--into <module>] [--reference <module>] [--single]
 allowed-tools: Read, Glob, Grep, WebFetch, WebSearch, Write, Bash, Task
 ---
@@ -19,6 +20,33 @@ Target: $ARGUMENTS
 | 6 | generator | A | Module spec generation from research findings (Procedure 1) |
 | 6 | generator | B | Component spec generation to fill identified gaps (Procedure 3) |
 | 8 | evaluator, generator + Bash background (--multi) | A+B | Quality gate — validate + retry (parallel evaluator with Codex when --multi). See [procedure reference](../../skills/core/validation/references/quality-gate-procedure.md) |
+
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass source artifact paths and inline collected source contents on every agent call.
+Use named return payloads rather than prose-only summaries.
+The command owns all network access, worktree writes, and integration state.
+Internal agent calls use `Agent(subagent_type: "ouroboros:core:{agent}")`.
+The Bash Codex relay path is additive evidence only.
+
+| Invocation | Input | Instructions | Expected Output |
+|------------|-------|--------------|-----------------|
+| Phase 3 researcher | All collected source content from Phase 2, source type, original target, mode, and relevant knowledge-base context | Apply `agents/core/researcher.md` with `skills/core/absorption/SKILL.md`. Extract patterns, component inventory, architecture signals, and mode-specific guidance without inventing unsupported source claims. | Research Analysis Report with ordered sections `Key Findings`, `Component Inventory`, `Architectural Patterns`, `Mode-Specific Guidance`, and `Suggested Tags`. |
+| Phase 5 evaluator, Mode B | Source component inventory, existing module contents, module name, and matching criteria references under `skills/core/evaluation/references/` | Apply `agents/core/evaluator.md` as a gap analyst. Compare source capabilities versus the module, classify each capability as `gap`, `overlap`, or `conflict`, and prioritize only actionable gaps. | Gap Analysis Report with ordered sections `Gaps`, `Overlaps`, `Conflicts`, and `Recommended Components`. |
+| Phase 6 generator | Use the mode-specific inputs defined in Phase 6 plus the relevant criteria references and templates | Apply `agents/core/generator.md` Procedure 1 for Mode A or Procedure 3 for Mode B, plus `skills/core/absorption/SKILL.md` for adaptation boundaries. Emit only the structured module or component spec required by the active mode. | Mode A returns a Module Spec with `manifest`, `rationale`, `files`, and `readme`. Mode B returns a Component Spec with `path`, `rationale`, and `content`. |
+| Phase 8 evaluator and retry generator | Generated component content, detected component type, and any prior validation findings | Apply `skills/core/validation/references/quality-gate-procedure.md`. Evaluate to Level >= 2, and if the gate fails, rerun only the failing component through `agents/core/generator.md` with the cited criteria IDs. | Evaluation payload with score, verdict, and failing criteria, plus targeted replacement content for any approved retry. |
+
+Before machine-parsing any researcher, evaluator, or generator payload, strip the trailing status block per `skills/core/routing/references/completion-status-protocol.md`.
+
+## Output Contracts
+
+| Output | Condition | Contract |
+|--------|-----------|----------|
+| Mode A design checkpoint | Phase 5 Mode A before generation | Render the design summary block in Phase 5 with module name, domain, planned component list, and an explicit approve-or-adjust decision |
+| Mode B high-overlap checkpoint | Phase 5 Mode B when `overlap_count > gap_count` and `gap_count <= 2` | Render `## High-Overlap Checkpoint: {source-display} → {module}` with ordered sections `### Coverage Summary`, `### Proposed Gap Components`, `### Options`, and `### Recommendation` |
+| Final review draft | Phase 10 | Use the review contract in Phase 10 with branch, mode, source, research summary, generated components, optional conflicts, diff, and decision entry |
+
 
 ## Phase 1: Parse Input
 
@@ -71,6 +99,30 @@ Determine source type using the same logic as `/research`:
    - Abort
 
 Log parsed input: source, source type, mode, reference module. Proceed automatically.
+
+## Branch Summary
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| `source` | missing | 1 abort | Emit the usage error and stop |
+| `--into` | absent | 1-11 | Run Mode A new-module absorption |
+| `--into` | present and valid | 1-11 | Run Mode B integration flow |
+| `--into` | present but target module missing | 1 abort | Emit the missing-module error and stop |
+| Source type | local path | 2 | Collect via local Glob/Read only |
+| Source type | URL | 2 | Collect via WebFetch and linked-page expansion |
+| Source type | topic text | 2 | Collect via WebSearch plus WebFetch |
+| `--single` | true | 3, 5, 8 | Force Claude-only analysis, gap analysis, and validation |
+| `--single` | false (default) + Codex available | 3, 5, 8 | Enable parallel Claude + Codex branches |
+| `--single` | false (default) + Codex unavailable | 3, 5, 8 | Fall back to Claude-only execution |
+| Mode A design checkpoint | user adjusts design | 5, 6 | Revise scope or module plan before generation |
+| Mode A design checkpoint | user approves | 5, 6 | Continue to generation |
+| Mode B gap analysis | no actionable gaps | 5, 6, 8 | Skip generation and validation, store knowledge entry only |
+| Mode B high-overlap checkpoint | user chooses generation | 5, 6 | Continue to gap-filling generation |
+| Mode B high-overlap checkpoint | user chooses knowledge-only | 5, 6, 8 | Skip generation and validation, record knowledge entry only |
+| Existing worktree | found | 7 | User chooses Resume, Discard, or Merge before continuing |
+| Generated component set | empty | 7, 8 | Write knowledge entry only and skip quality validation |
+| Phase 10 review | user chooses Merge | 10, 11 | Merge the worktree and present the completion report |
+| Phase 10 review | user chooses Discard | 10 | Discard the draft and stop |
 
 ## Phase 2: Gather Sources
 
@@ -139,6 +191,8 @@ Launch the **researcher** agent via Task tool:
 When `--multi` is active, run Codex researcher in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: `skills/core/absorption/references/researcher-relay-prompt.md` — wrap collected source content in `<<<UNTRUSTED_CONTENT_START>>>` / `<<<UNTRUSTED_CONTENT_END>>>` markers before inserting as Section 2. Merge strategy: cherry-pick (union of findings, prefer stronger evidence, novel Codex insights marked "External insight"). Codex failure → Claude-only.
 
 ### Parse Results
+
+Before extracting findings from the researcher's report, strip the trailing completion status block from `skills/core/routing/references/completion-status-protocol.md` if present.
 
 Extract from the researcher's report (or merged analysis when `--multi`):
 
@@ -250,9 +304,40 @@ When `--multi` is active, run Codex gap analyst in parallel per `skills/core/rou
 
 #### Process Results
 
+Before classifying gaps from the evaluator's report, strip the trailing completion status block from `skills/core/routing/references/completion-status-protocol.md` if present.
+
 3. **Filter actionable gaps**: Select gaps fillable with new components. For each gap, determine component type and name. Conflicts → log for review phase. No gaps → Log "No gaps identified." → Skip to Phase 7 (knowledge entry only)
 
 4. **High-overlap checkpoint**: If overlap count > gap count AND gap count <= 2, present summary and offer: proceed with generation or record knowledge entry only. Otherwise → proceed automatically
+
+#### High-Overlap Checkpoint Output Contract
+
+When the checkpoint triggers, render exactly this structure before asking for a decision:
+
+```markdown
+## High-Overlap Checkpoint: {source-display} → {module}
+
+### Coverage Summary
+
+| Gaps | Overlaps | Conflicts |
+|------|----------|-----------|
+| {gap_count} | {overlap_count} | {conflict_count} |
+
+### Proposed Gap Components
+
+| Capability Gap | Proposed Type | Proposed Path |
+|----------------|---------------|---------------|
+| {gap} | {type} | `{path}` |
+
+### Options
+
+1. `Proceed with generation` — create the gap-filling components above.
+2. `Knowledge entry only` — stop after the research artifact because existing coverage is already high.
+
+### Recommendation
+
+- {recommended option} — {one-sentence reason tied to overlap vs gap count}
+```
 
 5. **Reference components**: For each component type to generate, identify 1-2 existing same-type components (prefer same module, then `core/`). Read evaluation criteria: `skills/core/evaluation/references/{type}-criteria.md`
 
@@ -262,45 +347,16 @@ Log: "Gap analysis complete. {N} gaps to fill, {M} overlaps, {K} conflicts."
 
 > Agent: **generator**
 
-### Mode A: Module Generation
+### Generation Contract by Mode
 
-Launch the **generator** agent via Task tool:
+| Mode | Generation Unit | Input | Instructions | Expected Output | Parse Steps |
+|------|-----------------|-------|--------------|-----------------|-------------|
+| A | Whole module | Phase 5 module spec, Phase 3 research findings, Phase 4 knowledge-entry draft, Phase 5 reference patterns, Phase 5 criteria, and `templates/core/module-scaffold.md` | Apply `agents/core/generator.md` Procedure 1. Transform the external source into ouroboros conventions while preserving the important patterns surfaced in Phase 3. | Module Spec with `manifest`, `rationale`, `files`, and `readme` | Strip the trailing status block per `skills/core/routing/references/completion-status-protocol.md`, then extract the manifest, file contents, and README |
+| B | One actionable gap at a time | Gap spec from Phase 5, existing module components, same-type references, relevant Phase 3 findings, and `skills/core/evaluation/references/{type}-criteria.md` | Apply `agents/core/generator.md` Procedure 3. Generate only the component needed to close the named gap and keep the existing module conventions intact. | Component Spec with `path`, `rationale`, and `content` | Strip the trailing status block per `skills/core/routing/references/completion-status-protocol.md`, then extract `path` and `content` for each gap and append them to the unified manifest |
 
-- **Input**: All context from Phase 3-5:
-  - Module spec: name, domain description, capabilities (from Phase 5 design)
-  - Research findings and knowledge entry draft (from Phase 3-4)
-  - Reference module patterns (from Phase 5 reference structure)
-  - Evaluation criteria (from Phase 5)
-  - Scaffold template
-- **Instructions**: "Perform Module Generation (Procedure 1). The source material comes from an external absorption — transform external patterns into ouroboros module conventions. Analyze reference patterns, design module architecture, generate all component file contents. Output a complete Module Spec with manifest, rationale, and file contents."
-- **Expected output**: Module Spec (component manifest + rationale + all file contents)
-
-Parse the Module Spec:
-
-1. Extract the component manifest (list of files to create)
-2. Extract each file's content
-3. Extract the Module README content
-
-### Mode B: Component Generation (per gap)
-
-For each gap identified in Phase 5, launch the **generator** agent via Task tool:
-
-- **Input**: All context from Phase 3-5:
-  - Component spec: module name, component name, description, type (from Phase 5 gaps)
-  - Existing module components (all files — for pattern extraction)
-  - Same-type reference components (from Phase 5)
-  - Research findings relevant to this gap (from Phase 3)
-  - Evaluation criteria for the target component type
-- **Instructions**: "Perform Component Generation (Procedure 3). This component fills a gap identified during external source absorption. Analyze existing module patterns, generate a single component that integrates seamlessly. Output a Component Spec with path, rationale, and file content."
-- **Expected output**: Component Spec (path + rationale + file content)
-
-Parse each Component Spec:
-
-1. Extract the file path
-2. Extract the file content
-
-Collect all generated components into a unified manifest.
-
+Launch the generator according to the row that matches the current mode.
+Mode B repeats the same contract once per selected gap.
+Collect all parsed outputs into a unified manifest.
 Log: "Generation complete. {N} components generated."
 
 ### Integration Plan (Mode A + B)
@@ -362,7 +418,7 @@ Write the knowledge entry (from Phase 4) to the worktree:
 1. Generate filename: `docs/specs/knowledge/{slugified-title}.md`
 2. Check if file already exists in main branch:
    - If exists → append version suffix (e.g., `-v2`)
-3. Write: `.worktrees/absorb-{slug}/docs/specs/knowledge/{filename}.md`
+3. Write: `$WORKTREE/docs/specs/knowledge/{filename}.md`
 
 ### 7c: Write Generated Components
 
@@ -371,28 +427,28 @@ Write the knowledge entry (from Phase 4) to the worktree:
 1. Create module directories in the worktree:
 
    ```bash
-   mkdir -p .worktrees/absorb-{slug}/commands/{module-name}
-   mkdir -p .worktrees/absorb-{slug}/agents/{module-name}
+   mkdir -p "$WORKTREE/commands/{module-name}"
+   mkdir -p "$WORKTREE/agents/{module-name}"
    ```
 
    (Only directories that will contain files)
 
 2. Write each component file:
-   - `.worktrees/absorb-{slug}/{component-path}`
+   - `$WORKTREE/{component-path}`
 
 3. Write the Module README:
-   - `.worktrees/absorb-{slug}/commands/{module-name}/README.md`
+   - `$WORKTREE/commands/{module-name}/README.md`
 
 **Mode B — Gap-Filling Components:**
 
 1. For each generated component, ensure the directory exists:
 
    ```bash
-   mkdir -p .worktrees/absorb-{slug}/{type-directory}/{module}
+   mkdir -p "$WORKTREE/{type-directory}/{module}"
    ```
 
 2. Write each component file:
-   - `.worktrees/absorb-{slug}/{component-path}`
+   - `$WORKTREE/{component-path}`
 
 **If no gaps (Mode B skip):** Only the knowledge entry is written. No generated components.
 
@@ -412,14 +468,22 @@ For each component, run Mode A static evaluation. Quality gate threshold: Level 
 
 When `--multi` is active, run Codex evaluator in parallel per `skills/core/routing/references/parallel-execution-pattern.md`. Relay prompt: `skills/core/evaluation/references/evaluator-relay-prompts.md`. Consensus: per-criterion majority rule per `skills/core/routing/references/consensus-protocol.md`. Circuit breaker: 2 consecutive Codex failures → skip for remaining.
 
+### Validation Recovery
+
+| Failure | Max Retries | Stagnation Detection | Stop Behavior |
+|---------|-------------|----------------------|---------------|
+| Quality gate fail on a generated component | 1 retry per component | The retry returns the same failing criteria set, no score improvement, or byte-identical replacement content | Stop retrying that component, keep the best available draft, and surface the unresolved failure in Phases 10-11 |
+| Claude retry generator output is incomplete | 1 retry per component | The retry still omits the same required fields or path/content pair | Mark the component as failed, preserve the knowledge entry, and ask the user whether to keep or discard the draft at review |
+| Codex evaluator failure in `--multi` | 1 retry per component | The retry also fails or adds no new passing criteria beyond Claude's result | Continue with Claude-only validation for the remaining components |
+
 Log quality validation results and proceed to Phase 9.
 
 ## Phase 9: Record Decision
 
 Create an absorb decision entry in the worktree:
 
-- `.worktrees/absorb-{slug}/docs/decisions/{date}-absorb-{module-name}.md` (Mode A)
-- `.worktrees/absorb-{slug}/docs/decisions/{date}-absorb-into-{module}.md` (Mode B)
+- `$WORKTREE/docs/decisions/{date}-absorb-{module-name}.md` (Mode A)
+- `$WORKTREE/docs/decisions/{date}-absorb-into-{module}.md` (Mode B)
 
 Entry must include:
 

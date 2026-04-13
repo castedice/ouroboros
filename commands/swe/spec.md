@@ -1,5 +1,6 @@
 ---
-description: "Specification composite — orchestrate Stages 1-4 (Understand, Constrain, Design, Interface) to produce a complete specification"
+name: swe:spec
+description: "Use when you need one command to turn a task into a complete implementation specification before coding starts"
 argument-hint: "<task-description> [--fast] [--depth <global|per-stage>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
@@ -10,14 +11,29 @@ Orchestrate the 4 specification stages sequentially — Understand, Constrain, D
 
 Target: $ARGUMENTS
 
-## Agents Used
+## Agents & Tools Used
 
-| Phase | Agent | Role |
-|-------|-------|------|
+| Phase | Agent/Tool | Role |
+|-------|------------|------|
+| 1 | — (command) | Input parsing |
+| 1.5 | Read + Write (command) | Ambiguity scoring via `templates/swe/ambiguity-rubric.md` and persistence to `.swe/active/00-ambiguity.md` |
+| 2 | — (command) | Depth planning |
 | 3 | analyst | Stage 1 — Domain analysis (Understand) |
 | 4 | analyst | Stage 2 — Constraint enumeration (Constrain) |
 | 5 | analyst | Stage 3 — Architecture design (Design) |
 | 6 | analyst | Stage 4 — Contract definition (Interface) |
+
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass analyst artifact paths and inline contents on every call.
+Use named return payloads rather than prose-only summaries.
+The command owns artifact writes, retries, and degraded continuation state.
+Internal analyst calls use `Agent(subagent_type: "ouroboros:swe:analyst")`.
+
+| Agent | Phases | Input | Expected Output |
+|-------|--------|-------|-----------------|
+| `ouroboros:swe:analyst` | 3, 4, 5, and 6 | `task`, `depth_level`, `upstream_artifacts`, stage contract path, project-model summary, and `constraint_profile` when downstream stages require it | One stage payload containing exactly one of `context_document`, `constraint_profile`, `architecture_spec`, or `interface_contracts`, plus any `unresolved_questions[]` needed for recovery |
 
 ## Phase 1: Parse Input
 
@@ -38,17 +54,37 @@ Extract from $ARGUMENTS:
 | Global | `--depth Deep` | All 4 stages at Deep depth |
 | Per-stage | `--depth U:Std C:Std D:Deep I:Std` | Individual stage depths (U=Understand, C=Constrain, D=Design, I=Interface) |
 
-Parsing rules:
-
-- If single word (Skip/Light/Standard/Deep): apply to all 4 stages
-- If colon-separated pairs: parse each. Missing stages default to Standard
-- If any stage abbreviation is invalid: error and abort
-- If any depth value is invalid: error and abort
+Parse and validate `--depth` using `skills/swe/methodology/references/depth-procedure.md`.
+Apply the `/swe spec` composite shape from that reference: one global depth expands to all 4 stages, `U:` / `C:` / `D:` / `I:` pairs override named stages, and omitted stages default to `Standard`.
+Abort immediately on malformed shapes, unknown stage abbreviations, or invalid depth values.
 
 If `task` is empty:
 
 - Output: "Error: Task description required. Usage: `/swe spec <task-description> [--depth <global|U:level C:level D:level I:level>]`"
 - Abort
+
+## Phase 1.5: Ambiguity Assessment
+
+Score the task against `templates/swe/ambiguity-rubric.md`.
+
+### Branch Summary
+
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` format, stage abbreviation, or depth value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| Initial ambiguity score is `<= 0.2` | 1.5, 2-8 | Mark `PASS`, save `.swe/active/00-ambiguity.md`, and continue. |
+| Initial ambiguity score is `> 0.2` and `<= 0.5` | 1.5 | Mark `CLARIFY`, ask exactly 3 targeted questions on the weakest axis, rescore, and continue only if the rescored value is `<= 0.5`. |
+| Initial or rescored ambiguity score is `> 0.5` | 1.5 | Mark `ABORT`, save `.swe/active/00-ambiguity.md`, report the missing information, and stop before Stage 1. |
+| `--depth` is provided | 2 | Use the parsed global or per-stage depths. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth across all four stages and enable relaxed skip behavior downstream. |
+| Neither `--depth` nor `--fast` is provided | 2 | Build the per-stage depth plan from `skills/swe/methodology/references/depth-system.md`. |
+| Stage 1 validation fails after one retry | 3 | Abort the composite and recommend `/swe understand` standalone. |
+| Stage 2 validation fails after one retry | 4 | Offer degraded continuation with a flagged Constraint Profile placeholder or abort the composite. |
+| Stage 3 validation fails after one retry | 5 | Abort the composite and recommend `/swe design` standalone. |
+| Stage 4 validation fails after one retry | 6-8 | Preserve Stages 1-3 artifacts, mark the chain as partial, and recommend `/swe interface` standalone. |
+| All four stages succeed | 7, 8 | Present the full artifact chain for review and hand off to `/swe dev`. |
+| User approves degraded Stage 2 continuation | 4-8 | Write `.swe/active/02-constrain.md` as `missing — design may be over/under-scoped` and continue with explicit risk markers in later outputs. |
 
 ## Phase 2: Depth Planning
 
@@ -81,86 +117,72 @@ Log the Depth Plan. Present to user for confirmation:
 Proceed with this plan, or adjust depths?
 ```
 
+### Stage Orchestration Contract
+
+Use the primitive stage contracts as the execution boundary instead of restating their full domain procedures here.
+Each row below names the source contract, the artifact it must produce, the validation gate, and the bounded recovery rule this composite applies.
+
+| Composite phase | Stage contract path | Shared instruction path | Input handoff | Output artifact | Validation gate | Failure handling |
+|-----------------|---------------------|-------------------------|---------------|-----------------|-----------------|------------------|
+| 3 | `commands/swe/understand.md` | `skills/swe/methodology/references/agent-instructions.md` | Task + Stage 1 depth + project-domain summary when present | `.swe/active/01-understand.md` | `Problem Statement` and `Affected Components` must exist | Retry once at Light depth, then abort the composite. |
+| 4 | `commands/swe/constrain.md` | `skills/swe/methodology/references/agent-instructions.md` | Task + Context Document + Stage 2 depth + project-constraints summary when present | `.swe/active/02-constrain.md` | Standard+ depth must cover all 6 categories | Retry once with explicit category coverage, then offer degraded continuation or abort. |
+| 5 | `commands/swe/design.md` | `skills/swe/methodology/references/agent-instructions.md` | Task + Context Document + Constraint Profile + Stage 3 depth + project-architecture summary when present | `.swe/active/03-design.md` | If a Constraint Profile exists, at least 1 design decision must trace to it | Retry once with explicit traceability requirements, then abort the composite. |
+| 6 | `commands/swe/interface.md` | `skills/swe/methodology/references/agent-instructions.md` | Task + Architecture Spec + Constraint Profile + Stage 4 depth + project-interfaces summary when present | `.swe/active/04-interface.md` | At least 1 interface must be defined and all must have explicit type definitions | Retry once with explicit contract/testability requirements, then preserve the partial chain and stop. |
+
+### Shared Stage Execution Pattern
+
+Phases 3-6 use the same composite execution loop from `skills/swe/methodology/references/composite-checkpoint-rules.md`.
+Stage behavior comes from `skills/swe/methodology/references/pipeline-spec-stages.md` and agent prompting comes from `skills/swe/methodology/references/agent-instructions.md`.
+
+1. Read the relevant row from the Stage Orchestration Contract.
+2. Build only the listed `Input handoff` packet for that stage.
+3. Delegate through the listed `Shared instruction path`.
+4. Write the listed `Output artifact`.
+5. Apply the listed `Validation gate`.
+6. If validation fails, apply the listed `Failure handling` exactly once.
+
 ## Phase 3: Stage 1 — Understand
 
-Execute the Understand stage by delegating to the analyst agent:
+Use the Shared Stage Execution Pattern with the Phase 3 row from the Stage Orchestration Contract.
+Input handoff: task + Stage 1 depth + project-domain summary when present.
+Success log: "Stage 1 complete. Context Document written."
 
-> Agent: **analyst**
-
-- **Input**: Task description + depth level for Understand + Project Context (if `docs/specs/project/domain.md` exists, include its `## Summary` section)
-- **Instructions**: Follow the Stage 1 (Understand) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
-- **Expected output**: Context Document content
-
-1. Survey codebase for task-relevant context (same as understand.md Phase 3)
-2. Delegate to analyst
-3. Write Context Document to `.swe/active/01-understand.md`
-4. Validate output: Problem Statement and Affected Components must be present. If missing: retry once at Light depth
-5. Log: "Stage 1 complete. Context Document written."
-
-### Stage 1 Failure
-
-If analyst fails after retry: abort composite. Output: "Stage 1 (Understand) failed. Cannot proceed without Context Document. Run `/swe understand` standalone for diagnostics."
+If Stage 1 still fails after its single retry, abort the composite with: "Stage 1 (Understand) failed. Cannot proceed without Context Document. Run `/swe understand` standalone for diagnostics."
 
 ## Phase 4: Stage 2 — Constrain
 
-Execute the Constrain stage, passing the Context Document forward:
+Use the Shared Stage Execution Pattern with the Phase 4 row from the Stage Orchestration Contract.
+Input handoff: task + `.swe/active/01-understand.md` + Stage 2 depth + project-constraints summary when present.
+Success log: "Stage 2 complete. Constraint Profile written. {n} constraints across {m}/6 categories."
 
-> Agent: **analyst**
-
-- **Input**: Task description + Context Document content + depth level for Constrain + Project Context (if `docs/specs/project/constraints.md` exists, include its `## Summary` section)
-- **Instructions**: Follow the Stage 2 (Constrain) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
-- **Expected output**: Constraint Profile content
-
-1. Delegate to analyst with Context Document as input context
-2. Write Constraint Profile to `.swe/active/02-constrain.md`
-3. Validate: At Standard+ depth, all 6 categories must have entries. If gap: retry with explicit category coverage instruction
-4. Log: "Stage 2 complete. Constraint Profile written. {n} constraints across {m}/6 categories."
-
-### Stage 2 Failure
-
-If analyst fails after retry: offer degraded mode. "Stage 2 (Constrain) failed. Options: (A) Proceed to Design without constraints (risk: unconstrained design). (B) Abort and run `/swe constrain` standalone."
-
-If user chooses A: proceed with empty Constraint Profile flagged as "missing — design may be over/under-scoped."
+If Stage 2 still fails after its single retry, offer degraded continuation.
+"Stage 2 (Constrain) failed. Options: (A) Proceed to Design without constraints and write `.swe/active/02-constrain.md` as `missing — design may be over/under-scoped`. (B) Abort and run `/swe constrain` standalone."
 
 ## Phase 5: Stage 3 — Design
 
-Execute the Design stage, passing the Constraint Profile forward:
+Use the Shared Stage Execution Pattern with the Phase 5 row from the Stage Orchestration Contract.
+Input handoff: task + `.swe/active/01-understand.md` + `.swe/active/02-constrain.md` + Stage 3 depth + project-architecture summary when present.
+Success log: "Stage 3 complete. Architecture Spec written. {n} decisions, {m} traced to constraints."
 
-> Agent: **analyst**
-
-- **Input**: Task description + Context Document content + Constraint Profile content + depth level for Design + Project Context (if `docs/specs/project/architecture.md` exists, include its `## Summary` section)
-- **Instructions**: Follow the Stage 3 (Design) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
-- **Expected output**: Architecture Spec content
-
-1. Survey existing architecture patterns (same as design.md Phase 3)
-2. Delegate to analyst with both upstream artifacts
-3. Write Architecture Spec to `.swe/active/03-design.md`
-4. Validate: If Constraint Profile exists, check constraint traceability — at least 1 design decision must reference a constraint. If 0 traceability: retry
-5. Log: "Stage 3 complete. Architecture Spec written. {n} decisions, {m} traced to constraints."
-
-### Stage 3 Failure
-
-If analyst fails after retry: abort composite. Output: "Stage 3 (Design) failed. Architecture Spec required for Interface stage. Run `/swe design` standalone for diagnostics."
+If Stage 3 still fails after its single retry, abort the composite with: "Stage 3 (Design) failed. Architecture Spec required for Interface stage. Run `/swe design` standalone for diagnostics."
 
 ## Phase 6: Stage 4 — Interface
 
-Execute the Interface stage, passing the Architecture Spec forward:
+Use the Shared Stage Execution Pattern with the Phase 6 row from the Stage Orchestration Contract.
+Input handoff: task + `.swe/active/03-design.md` + `.swe/active/02-constrain.md` + Stage 4 depth + project-interfaces summary when present.
+Success log: "Stage 4 complete. Interface Contracts written. {n} interfaces defined."
 
-> Agent: **analyst**
+If Stage 4 still fails after its single retry, preserve the completed Stage 1-3 artifacts and stop with: "Stage 4 (Interface) failed, but Stages 1-3 completed successfully. Run `/swe interface` standalone to complete the specification."
 
-- **Input**: Task description + Architecture Spec content + Constraint Profile content (for performance SLAs) + depth level for Interface + Project Context (if `docs/specs/project/interfaces.md` exists, include its `## Summary` section)
-- **Instructions**: Follow the Stage 4 (Interface) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
-- **Expected output**: Interface Contracts content
+## Output Contracts
 
-1. Survey existing interfaces (same as interface.md Phase 3)
-2. Delegate to analyst with upstream artifacts
-3. Write Interface Contracts to `.swe/active/04-interface.md`
-4. Validate: At least 1 interface defined. All interfaces have type definitions. If validation fails: retry
-5. Log: "Stage 4 complete. Interface Contracts written. {n} interfaces defined."
-
-### Stage 4 Failure
-
-If analyst fails after retry: present partial results. All prior artifacts remain valid. "Stage 4 (Interface) failed, but Stages 1-3 completed successfully. Run `/swe interface` standalone to complete the specification."
+| Mode | Trigger | Payload location | Required sections or fields |
+|------|---------|------------------|-----------------------------|
+| Full specification | Ambiguity gate passes and Stages 1-4 complete | Phase 7 review plus Phase 8 report | `Artifact Chain`, `Key Highlights`, `Contract Chain Validation`, `Next Steps`, and `See Also`. |
+| Ambiguity abort | Initial or rescored ambiguity score is `> 0.5` | `.swe/active/00-ambiguity.md` plus a blocking message | `Status`, score breakdown, weakest axis, missing information summary, and stop reason. |
+| Degraded continuation | Stage 2 fails and the user chooses option A | `.swe/active/02-constrain.md` placeholder plus downstream artifacts if produced | `Artifact Chain` with Stage 2 marked `degraded`, unconstrained-design risk, placeholder path, and recovery command `/swe constrain`. |
+| Partial chain | Stage 4 fails after Stage 1-3 succeed | Phase 7 review plus Phase 8 report | `Artifact Chain` with partial statuses, completed artifact paths, missing Interface stage, exact recovery command `/swe interface`, and next-step guidance. |
+| Fatal stage failure | Stage 1 or Stage 3 fails after retry, or the user aborts after Stage 2 failure | User-facing error only beyond already-written artifacts | Last valid artifact, failed stage, stop reason, and exact standalone resume command. |
 
 ## Phase 7: Review
 
@@ -198,7 +220,8 @@ Review the specification artifacts, or approve to proceed.
 ## Spec Complete: {task summary}
 
 **Depth Plan**: U:{level} C:{level} D:{level} I:{level}
-**Artifacts**: 4 files in `.swe/active/`
+**Pre-spec gate**: `.swe/active/00-ambiguity.md`
+**Artifacts**: 4 stage files in `.swe/active/`
 
 ### Next Steps
 Run development stages (Test, Implement, Verify, Optimize):
@@ -222,8 +245,8 @@ Run development stages (Test, Implement, Verify, Optimize):
 ## Rules
 
 - Each stage delegates to the analyst agent — the command orchestrates, not executes
-- Artifacts are written sequentially: each stage's output becomes the next stage's input
-- Artifact paths follow `.swe/active/{NN}-{stage}.md` convention
+- Artifacts are written sequentially: the pre-spec ambiguity gate writes `.swe/active/00-ambiguity.md`, then each stage's output becomes the next stage's input
+- Artifact paths use `.swe/active/00-ambiguity.md` for the pre-spec gate and `.swe/active/{NN}-{stage}.md` for the Stage 1-4 chain
 - User checkpoint occurs once at Phase 7 (Review) — individual stages do not pause for user review when run as part of spec
 - Backward transitions within spec: if a downstream stage reveals upstream gaps, the command re-runs the upstream stage (not the primitive command) with additional context
 - Failure isolation: each stage can fail independently. Prior completed artifacts remain valid

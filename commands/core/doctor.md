@@ -1,6 +1,6 @@
 ---
 name: core:doctor
-description: System health check — verify CLI tools, MCP, settings, hooks, LSP, plugin version
+description: Use when you need to verify ouroboros environment health
 argument-hint: ""
 allowed-tools: Read, Glob, Grep, Bash, Agent
 ---
@@ -15,12 +15,28 @@ Target: $ARGUMENTS
 
 | Phase | Agent/Tool | Role |
 |-------|-----------|------|
-| 2-7 | — (command) | Health checks via Read, Glob, Grep, Bash |
-| 8 | researcher (agent, conditional) | Deep analysis when FAIL found — diagnose root cause and suggest fix |
+| 2-8 | — (command) | Health checks via Read, Glob, Grep, Bash |
+| 9 | researcher (agent, conditional) | Deep analysis when FAIL found — diagnose root cause and suggest fix |
 
 ## Phase 1: Parse Input
 
 No flags in MVP. If arguments are provided, log "Doctor does not accept arguments yet. Running full check." and proceed.
+
+### Branch Summary
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| Extra arguments | present | 1 | Warn and continue with the full health check |
+| `--fix` | present | 1, 9 | Warn that fix mode is not implemented and continue report-only |
+| Codex CLI | missing | 2, 9 | Record WARN and continue |
+| MCP servers | none discovered | 4 | Record OK: no MCP servers configured |
+| Project settings | missing | 4 | Record WARN and continue with remaining checks |
+| Hooks or `.lsp.json` | invalid JSON or missing scripts | 5, 9 | Record FAIL and trigger Phase 9 deep analysis |
+| Learning data | missing overlays or empty directories | 6 | Record OK or WARN per finding and continue |
+| Plugin manifest | missing or invalid | 7, 9 | Record WARN and continue |
+| Any FAIL present | true | 9 | Delegate root-cause analysis before recommendations |
+| Any FAIL present | false | 9 | Skip deep analysis and render the report directly |
+
 
 Initialize a results collector:
 
@@ -28,104 +44,56 @@ Initialize a results collector:
 checks = []  // { name, status: OK|WARN|FAIL, detail }
 ```
 
-## Phase 2: External CLI Check
+## Phase 2: Health Collector
 
-Check availability and version of external CLI tools used by ouroboros multi-model features.
+Delegate the raw environment audit to the researcher agent as a read-only health collector so the command stays at the orchestration layer.
 
-### Codex CLI
+> Agent: **researcher** (subagent_type: `ouroboros:core:researcher`)
 
-Use Bash to check if `codex` is available on PATH and retrieve its version.
+### Collector Contract
 
-| Result | Status | Detail |
-|--------|--------|--------|
-| Found with version | OK | "codex v{version} at {path}" |
-| Not found | WARN | "codex not installed — multi-model features unavailable" |
+| Contract Part | Content |
+|---------------|---------|
+| Input | Current plugin root, project root, home-level Claude settings paths, project-level Claude settings paths, `hooks/hooks.json`, `.lsp.json`, `${CLAUDE_PLUGIN_DATA:-${CLAUDE_PLUGIN_ROOT}/.tmp}`, and `.claude-plugin/plugin.json` |
+| Instructions | Perform a read-only environment audit. Use Bash, Read, Glob, and Grep only to collect evidence. Populate `.tmp/{SESSION_ID}_doctor_checks.json` with check rows for `external_cli`, `mcp`, `settings`, `hooks`, `lsp`, `learning_pipeline`, and `plugin_version`. For each row return `name`, `status`, `detail`, `family`, and `evidence_path`. Never repair files or suppress failures. |
+| Expected Output | A machine-consumable JSON payload at `.tmp/{SESSION_ID}_doctor_checks.json` plus a compact summary message listing FAIL and WARN counts. |
 
-Add result to `checks`.
+The collector must treat `.tmp/{SESSION_ID}_doctor_checks.json` as the authoritative payload.
+If the collector cannot inspect a family, it must still emit a row for that family with `status: FAIL` or `WARN` and the blocked path in `detail`.
+If the agent returns prose, use it only as an execution log.
+Strip any trailing status block per `skills/core/routing/references/completion-status-protocol.md` before reading the summary text.
 
-## Phase 3: MCP Connection Status
+## Phase 3: External CLI Findings
 
-Read Claude Code settings to discover configured MCP servers.
+Read `.tmp/{SESSION_ID}_doctor_checks.json`.
+Copy every `family="external_cli"` row into `checks`.
 
-1. Read `~/.claude/settings.json` — extract `mcpServers` keys
-2. Read `~/.claude/settings.local.json` — extract `mcpServers` keys (if exists)
-3. Read `.claude/settings.json` (project-level) — extract `mcpServers` keys (if exists)
-4. Read `.claude/settings.local.json` (project-level) — extract `mcpServers` keys (if exists)
+## Phase 4: MCP + Settings Findings
 
-For each discovered MCP server entry:
+Read `.tmp/{SESSION_ID}_doctor_checks.json`.
+Copy every `family="mcp"` and `family="settings"` row into `checks`.
 
-| Check | Status | Detail |
-|-------|--------|--------|
-| Entry exists with `command` field | OK | "{name}: configured ({command})" |
-| Entry exists but missing `command` | WARN | "{name}: configured but no command specified" |
-| No MCP servers found | OK | "No MCP servers configured" |
+## Phase 5: Hook + LSP Findings
 
-Add results to `checks`.
+Read `.tmp/{SESSION_ID}_doctor_checks.json`.
+Copy every `family="hooks"` and `family="lsp"` row into `checks`.
 
-## Phase 4: Settings Validation
+## Phase 6: Learning Pipeline Findings
 
-Read project-level `.claude/settings.json` and verify essential patterns for ouroboros operation.
+Read `.tmp/{SESSION_ID}_doctor_checks.json`.
+Copy every `family="learning_pipeline"` row into `checks`.
 
-### Required Patterns
+## Phase 7: Plugin Version Findings
 
-Check the following exist in `allowedTools` or equivalent allow list:
+Read `.tmp/{SESSION_ID}_doctor_checks.json`.
+Copy every `family="plugin_version"` row into `checks`.
 
-| Pattern | Purpose | Missing = |
-|---------|---------|-----------|
-| `Bash(codex *)` | Multi-model CLI invocation | WARN: "Bash(codex *) not in allow list — multi-model will prompt each time" |
-| `Bash(bash scripts/*)` | Script execution | WARN: "Bash(bash scripts/*) not in allow list — scripts will prompt each time" |
+## Phase 8: Health Summary Preparation
 
-### Deny Patterns
+Sort `checks` by severity (`FAIL` → `WARN` → `OK`) and then by family.
+Compute `ok_count`, `warn_count`, and `fail_count` for Phase 9 reporting.
 
-Verify safety deny patterns are present:
-
-| Pattern | Purpose | Missing = |
-|---------|---------|-----------|
-| `Bash(rm *)` deny | Safe deletion policy | WARN: "Bash(rm *) deny not found — safe-rm.sh bypass possible" |
-
-If `.claude/settings.json` does not exist: WARN "No project settings.json found."
-
-Add results to `checks`.
-
-## Phase 5: Hook Health
-
-Read `hooks/hooks.json` from the plugin root (`${CLAUDE_PLUGIN_ROOT}/hooks/hooks.json` or resolve from Glob).
-
-1. Parse JSON structure — if invalid JSON: FAIL "hooks.json: invalid JSON"
-2. For each hook type present in the JSON, iterate entries and verify the referenced script path (`entry.hooks[].command`) exists on disk via Glob.
-
-| Result | Status | Detail |
-|--------|--------|--------|
-| Script exists | OK | "{hook_type}/{matcher}: {script} exists" |
-| Script missing | FAIL | "{hook_type}/{matcher}: {script} NOT FOUND" |
-| Hook type not present | OK | (skip silently — not all types required) |
-
-Add results to `checks`.
-
-## Phase 6: LSP Configuration
-
-Check for `.lsp.json` in the project root.
-
-| Result | Status | Detail |
-|--------|--------|--------|
-| File exists and is valid JSON | OK | ".lsp.json: valid ({n} server configs)" |
-| File exists but invalid JSON | FAIL | ".lsp.json: invalid JSON — LSP features broken" |
-| File does not exist | OK | "No .lsp.json (LSP not configured)" |
-
-Add result to `checks`.
-
-## Phase 7: Plugin Version
-
-Read the plugin manifest at `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`.
-
-| Result | Status | Detail |
-|--------|--------|--------|
-| File exists and parseable | OK | "ouroboros v{version}" |
-| File missing or invalid | WARN | "plugin.json not found or invalid" |
-
-Add result to `checks`.
-
-## Phase 8: Report
+## Phase 9: Report
 
 ### Health Report Table
 
@@ -147,19 +115,62 @@ When any FAIL is found, delegate root cause analysis to the researcher agent:
 > Agent: **researcher** (subagent_type: `ouroboros:core:researcher`)
 
 - **Input**: FAIL entries from checks collector (name, status, detail)
-- **Reference**: `skills/core/validation.md` for hook/settings validation patterns; `hooks/hooks.json` for hook schema
+- **Reference**: `skills/core/validation/SKILL.md`, `hooks/hooks.json`, `.claude/settings.json`, `.lsp.json`, and `.tmp/{SESSION_ID}_doctor_checks.json`
+- **Payload handling**: Read FAIL source rows from `.tmp/{SESSION_ID}_doctor_checks.json`. Write deep-analysis notes to `.tmp/{SESSION_ID}_doctor_fail_analysis.md`. Strip any trailing status block per `skills/core/routing/references/completion-status-protocol.md` before extracting fixes.
+- **Consensus**: None. The recorded Phase 2-7 statuses remain authoritative even if the analyst proposes a softer interpretation.
 - **Instructions**: "Analyze these health check failures. For each FAIL: identify the root cause, check if related files exist or are misconfigured, and suggest a concrete fix command or edit."
-- **Expected output**: Per-FAIL analysis with fix suggestions
+- **Expected output**: `.tmp/{SESSION_ID}_doctor_fail_analysis.md` with one repeated block per FAIL using the ordered sections `## Failure: {name}`, `### Evidence`, `### Root Cause`, `### Fix Command`, and `### Verification`
+
+#### Deep-Analysis Output Contract
+
+The analyst must render `.tmp/{SESSION_ID}_doctor_fail_analysis.md` so every FAIL can be reconstructed and actioned without rereading the whole workspace:
+
+````markdown
+## Failure: {name}
+
+### Evidence
+- Status: {status}
+- Detail: {detail}
+- Evidence path: {evidence_path}
+
+### Root Cause
+- {concise diagnosis tied to the evidence}
+
+### Fix Command
+```bash
+{current-run command using the exact failing path or missing script from this run}
+```
+
+### Verification
+```bash
+{current-run verification command against the same path}
+```
+````
+
+### Recovery
+
+| Failure | Max Retries | Stagnation Detection | Stop Behavior |
+|---------|-------------|----------------------|---------------|
+| Phase 2 collector payload missing or malformed | 1 | The retry still omits one or more required families from `.tmp/{SESSION_ID}_doctor_checks.json` | Record a synthetic FAIL for the missing family and continue |
+| JSON parse failure for settings, hooks, or `.lsp.json` | 1 per file | The second read produces the same parse failure or byte-identical invalid content | Record FAIL once, stop retrying that file, and continue with remaining families |
+| Learning-root scan failure | 1 narrowed retry | The narrowed retry returns the same access or parse error | Record WARN with the blocked path and continue |
+| Phase 9 deep-analysis timeout or malformed output | 1 | The retry returns the same missing sections or no new root-cause detail | Omit deep analysis, surface raw FAIL rows, and stop recovery |
+
+No recovery path may retry more than once.
 
 ### Recommendations
 
-Generate context-aware recommendations based on findings:
+Generate context-aware recommendations from the current run's `checks` rows and, when present, the matching block in `.tmp/{SESSION_ID}_doctor_fail_analysis.md`.
+Populate `{evidence_path}`, `{detail}`, `{plugin_root}`, `{project_settings_path}`, `{hooks_path}`, `{lsp_path}`, and `{plugin_data_path}` from `.tmp/{SESSION_ID}_doctor_checks.json` before rendering the final report.
 
 | Condition | Recommendation |
 |-----------|----------------|
-| Any FAIL | Present researcher's fix suggestions. Ask user: "Apply suggested fixes? (y/n)" |
-| Codex WARN | "Install Codex CLI for multi-model evaluation: `npm i -g @openai/codex`" |
-| Settings WARN | "Add missing patterns to `.claude/settings.json` for smoother workflow." |
+| Any FAIL with deep-analysis output | Reproduce the matching `### Fix Command` and `### Verification` blocks from `.tmp/{SESSION_ID}_doctor_fail_analysis.md`, then ask the user whether to apply that exact fix |
+| Codex WARN on `{evidence_path}` | `npm i -g @openai/codex && codex --version` |
+| Settings WARN or FAIL on `{evidence_path}` | `jq empty "{evidence_path}"` and then edit that exact file to add the missing allowlist or shared settings entries named in `{detail}` |
+| Hooks FAIL on `{evidence_path}` | `jq empty "{evidence_path}"` and verify every referenced script exists under `"{plugin_root}/scripts/"` before rerunning `/doctor` |
+| `.lsp.json` FAIL on `{evidence_path}` | `jq empty "{evidence_path}"` and compare it to the matching template under `templates/core/lsp-configs/` |
+| Learning pipeline WARN on `{plugin_data_path}` | `bash ${CLAUDE_PLUGIN_ROOT}/scripts/learning-distill.sh distill` and inspect the warned path under `"{plugin_data_path}"` |
 | All OK | "Environment healthy. All ouroboros features available." |
 | First run | "`/onboard` — discover available modules and recommended workflows" |
 

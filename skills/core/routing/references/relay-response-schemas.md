@@ -2,51 +2,63 @@
 
 JSON response schemas for external model invocations via the Prompt Relay pattern. Each schema defines the expected output structure for a specific mode. Referenced by `commands/core/evaluate.md` Phase 3.5, `commands/core/research.md` Phase 3, `commands/core/brainstorm.md` Phase 3, and SWE commands (`commands/swe/ship.md`, `commands/swe/tune.md`) for `--multi` support.
 
-## Schema A: Static Evaluation (Mode A/B)
+## `eval-model-result.v1`: Evaluation Relay Output
+
+```json
+{
+  "schema_version": "eval-model-result.v1",
+  "criteria": [
+    {
+      "id": "F1",
+      "score": 0,
+      "evidence": ["Quoted or paraphrased evidence from the component or output"],
+      "reasoning": "Why the evidence does or does not satisfy the criterion."
+    }
+  ],
+  "strengths": ["One concrete strength"],
+  "improvements": [
+    {
+      "priority": "HIGH|MED|LOW",
+      "criterion_id": "F1",
+      "description": "One concrete improvement."
+    }
+  ]
+}
+```
+
+Used for all evaluator relay prompts in `/evaluate`.
+The pipeline normalizes this thin model-output schema into the canonical internal format before consensus or persistence.
+Normalization guarantees `criteria` is an array of `{id, score, evidence, reasoning}` objects and derives tier totals, `level`, `level_label`, `gated`, and `gate_reason` deterministically.
+
+## Schema A: Static Evaluation (Mode A/B, normalized internal shape)
 
 ```json
 {
   "criteria": [
-    { "id": "C1", "name": "criterion name", "score": 0 or 1, "reasoning": "minimum 3 sentences with specific evidence" }
+    { "id": "F1", "score": 0, "evidence": ["..."], "reasoning": "minimum 3 sentences with specific evidence" }
   ],
-  "overall_score": "sum of criteria scores",
+  "scores": { "F": [5, 5], "Q": [7, 7], "E": [3, 4] },
+  "level": 4,
+  "level_label": "Excellent",
+  "gated": false,
+  "gate_reason": null,
   "strengths": ["point 1", "point 2"],
-  "improvements": [{ "priority": "HIGH|MED|LOW", "description": "suggestion" }],
-  "context_used": ["instructions or skills referenced"]
+  "improvements": [{ "priority": "HIGH|MED|LOW", "criterion_id": "F1", "description": "suggestion" }]
 }
 ```
 
-Used for single-component static evaluation and module scan (each component individually).
+This is the normalized internal shape used after `scripts/eval-normalize.sh`.
+It is not the raw model-output contract.
 
 ## Schema C: Comparative Evaluation (Mode C)
 
-```json
-{
-  "before": {
-    "criteria": [
-      { "id": "C1", "name": "criterion name", "score": 0 or 1, "reasoning": "minimum 3 sentences with specific evidence" }
-    ],
-    "overall_score": "sum of criteria scores"
-  },
-  "after": {
-    "criteria": [
-      { "id": "C1", "name": "criterion name", "score": 0 or 1, "reasoning": "minimum 3 sentences with specific evidence" }
-    ],
-    "overall_score": "sum of criteria scores"
-  },
-  "regressions": [
-    { "criterion": "C1", "name": "criterion name", "reason": "why the after version is worse" }
-  ],
-  "verdict": "improved|degraded|lateral",
-  "verdict_reasoning": "summary of comparison"
-}
-```
+Mode C no longer uses a separate raw relay schema.
+The command sends one evaluator relay per version using `eval-model-result.v1`, normalizes both results, and derives verdicts/regressions in the controller flow.
 
-Used for before/after comparison. Both versions are evaluated independently within a single prompt.
+## Schema D: Output Evaluation (Mode D, normalized internal shape)
 
-## Schema D: Output Evaluation (Mode D)
-
-Same structure as Schema A. The difference is in the relay prompt content (component definition + collected output) and criteria reference (output criteria instead of static criteria).
+Same normalized shape as Schema A, except `scores` is flat output scoring such as `{ "C": [4, 5] }`.
+The raw relay output still uses `eval-model-result.v1`.
 
 ## Schema R: Research Analysis
 
@@ -170,19 +182,20 @@ Used for external model quality evaluation in `/swe tune --multi`. Improvement t
 
 | Pitfall | Cause | Remedy |
 |---------|-------|--------|
-| **Markdown-wrapped JSON** | Model wraps response in ` ```json ``` ` code blocks despite "no markdown" instruction | `invoke-model.sh` strips markdown fences before parsing; if still failing, reinforce "raw JSON only" in Section 4 |
-| **Missing required fields** | Model omits fields it considers empty (e.g., `regressions: []`) | Schema definitions show all fields including empty arrays; `invoke-model.sh` validates field presence |
+| **Markdown-wrapped JSON** | Model wraps response in ` ```json ``` ` code blocks despite "no markdown" instruction | `codex-relay.sh` strips markdown fences before parsing; if still failing, reinforce "raw JSON only" in Section 4 |
+| **Missing required fields** | Model omits fields it considers empty | Require `schema_version`, `criteria`, `strengths`, and `improvements` even when arrays are empty |
 | **Terse reasoning** | Model writes 1-sentence reasoning despite "minimum 3 sentences" requirement | Repeat the minimum length constraint in both Section 3 (methodology) and Section 4 (format) |
-| **Score-reasoning mismatch** | Model assigns score 1 but reasoning describes weaknesses, or vice versa | Consensus mechanism across models catches most mismatches; single-model mode relies on CoT-first scoring order |
+| **Score-reasoning mismatch** | Model assigns score 1 but reasoning describes weaknesses, or vice versa | `eval-normalize.sh` keeps only parseable criterion judgments, and consensus uses the normalized result rather than trusting model-level totals |
 | **coverage_assessment without questions** | Model populates `coverage_assessment` in non-deep mode when no research questions were provided | Field is optional; orchestrator ignores it if no research questions exist in the relay prompt |
 
 ## Design Rationale
 
-- **Separate schemas per mode** (A/C/D/R/BR/SR/CR/SQ) rather than a unified schema with a `type` field: Each mode has fundamentally different output structures. A unified schema would require extensive conditional fields, making validation harder and model compliance lower. Separate schemas keep each prompt's Section 4 self-contained.
+- **Thin evaluator relay schema**: External evaluators emit only per-criterion judgments plus strengths/improvements. Tier totals, labels, and gates are deterministic controller logic, so pushing them into the model output adds noise without adding signal.
+- **Separate schemas per task family** (`eval-model-result.v1`, `R`, `BR`, `SR`, `CR`, `SQ`) rather than a unified schema with a `type` field: Evaluation, research, brainstorming, and review outputs have different structures and validation needs. Keeping them separate improves compliance and reduces parsing ambiguity.
 - **SWE schemas (SR/CR/SQ) use free-form findings**: Unlike evaluation criteria (binary 0/1 scoring), review findings are inherently variable in count and structure. Finding union + severity consensus is more appropriate than per-criterion agreement for review output.
 - **`reasoning` minimum 3 sentences**: Binary scoring (0/1) requires explicit justification to prevent rubber-stamping. 3 sentences is the empirically tested minimum that forces the model to cite specific evidence rather than restate the criterion name. See `dev/experiments/model-optimization/` for calibration data.
 - **`coverage_assessment` optional in Schema R**: Only meaningful when `--deep` provides research questions. Making it required would force non-deep relay prompts to fabricate questions, reducing signal quality.
-- **`invoke-model.sh` fallback to LLM extraction**: JSON parsing failures are common with less structured models. Rather than failing entirely, the orchestrator extracts key fields from raw text — lower fidelity but preserves the multi-model signal.
+- **`codex-relay.sh` fallback to LLM extraction**: JSON parsing failures are common with less structured models. Rather than failing entirely, the orchestrator extracts key fields from raw text — lower fidelity but preserves the multi-model signal.
 
 ## Usage
 
@@ -193,4 +206,5 @@ Respond ONLY with a JSON object (no markdown, no explanation outside JSON):
 {schema content}
 ```
 
-The `scripts/invoke-model.sh` parser validates the JSON structure. On parse failure (exit code 1), the command falls back to LLM extraction from raw output.
+For evaluator relays, use `eval-model-result.v1`.
+After parse, run `scripts/eval-normalize.sh` before consensus or persistence.

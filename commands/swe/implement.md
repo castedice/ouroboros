@@ -1,7 +1,8 @@
 ---
-description: "Stage 6 — Write minimal code to pass all tests using TDD Green Phase (TDD)"
+name: swe:implement
+description: "Use when tests and interfaces are ready and you need the minimal code that makes them pass"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <test-suite-path>]"
-allowed-tools: Read, Glob, Grep, Write, Edit, Task, Bash
+allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
 
 # Implement — TDD Green Phase (Stage 6)
@@ -38,26 +39,26 @@ If `--depth` is provided, validate it is one of: Skip, Light, Standard, Deep. If
 
 ## Phase 2: Depth Decision
 
-If `--depth` was provided, use that value directly. Log: "Depth override: {depth}."
+### Branch Summary
 
-Otherwise, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md`:
-
-1. Score 5 factors (Task Scope, Risk Level, Domain Familiarity, Team Impact, Reversibility) based on the task description and codebase signals
-2. Sum scores (range 5-15) and map to depth level:
-
-| Score | Depth |
-|-------|-------|
-| 5-6 | Light |
-| 7-10 | Standard |
-| 11-15 | Deep |
-
-3. Check stage-specific minimum depth triggers from `depth-system.md`:
-   - Standard when implementation touches multiple bounded contexts
-   - Deep when performance constraints have numeric SLAs from the Constraint Profile
-4. Check escalation rules (safety-critical code, concurrency, or public API implementation)
-
-Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
-
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| No explicit depth is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and apply stage-specific triggers. |
+| Resolved depth is `Skip` | 2, 5, 6 | Write the minimal spec-only skip artifact to `.swe/active/06-implement.md` and jump to Phase 6. |
+| `--artifact` is provided and readable | 3 | Use that Test Suite artifact as the implementation contract. |
+| `--artifact` is missing or `.swe/active/05-test.md` does not exist | 3 | Abort because Stage 6 requires a Test Suite artifact. |
+| `.swe/active/04-interface.md` exists | 3 | Load Interface Contracts and use them as the primary non-test contract source. |
+| `.swe/active/04-interface.md` is missing | 3 | Warn and continue with test-driven implementation only. |
+| `.swe/active/03-design.md` or `.swe/active/02-constrain.md` is missing | 3 | Warn and continue with reduced architectural or performance context. |
+| Baseline tests already pass before implementation | 3 | Warn that no implementation may be needed and continue so the user can verify the artifact choice. |
+| Implementer times out or errors | 4 | Retry once with the simplified happy-path fallback prompt, then stop and report the failure. |
+| Implementation is partial and some tests still fail | 4, 5, 6 | Accept the partial result, write the artifact with the partial status, and recommend another `/swe implement` pass. |
+| Build errors or regressions persist after retry | 4, 5 | Stop and report the blocking failure rather than writing a false Green artifact. |
+| Independent Phase 5 verification confirms all tests pass | 5, 6 | Write the normal Green-state artifact and report success. |
+| Invoked by `/swe dev` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 ### Skip Handling
 
 If depth is **Skip**: Log "Stage 6 skipped — no implementation changes. Use for spec-only workflows." Produce minimal skip artifact noting "No implementation — spec-only workflow" and jump to Phase 6.
@@ -72,31 +73,25 @@ If depth is **Skip**: Log "Stage 6 skipped — no implementation changes. Use fo
 
 ## Phase 3: Context Gathering
 
-Collect all upstream artifacts and baseline state:
+### Stage 6 Execution Boundary
 
-1. **Test Suite artifact**: If `--artifact` is provided, read the file
-   - If file is missing: warn "Test Suite not found at {path}."
-   - If `--artifact` is not provided: use `.swe/active/05-test.md` as the Test Suite artifact. If not found:
-     - Output: "Error: Test Suite artifact required. Run `/swe test` first or provide `--artifact <path>`."
-     - Abort
-2. **Interface Contracts**: Read `.swe/active/04-interface.md` in full (required)
-   - Extract public interfaces, type definitions, error conditions — these are the contracts the implementation must fulfill
-   - If not found: warn "No Interface Contracts found. Implementation will be guided by test assertions only."
-3. **Architecture Spec**: Read `.swe/active/03-design.md`. At Light depth, read summary only (`Read(file, limit: 15)`) per the Selective Load Matrix in `artifact-contracts.md`. At Standard+ depth, read in full
-   - Extract module placement, naming conventions, data model, selected patterns
-   - If not found: warn "No Architecture Spec found. Implementation structure will follow existing codebase conventions."
-4. **Constraint Profile**: At Light depth, read summary only from `.swe/active/02-constrain.md`. At Standard+ depth, read in full
-   - Extract Hard performance constraints (required for Deep depth implementation)
-   - If not found at Deep depth: warn "No Constraint Profile found for Deep implementation. Performance targets unavailable."
-5. **Existing source code**: Survey codebase for files related to the task
-   - Use Glob and Grep to identify modules, packages, or files that will be modified or extended
-   - Read key files (up to 10 most relevant) to understand current patterns and conventions
-6. **Build system identification**: Detect project build/test commands
-   - Check for: `Cargo.toml` (cargo test), `package.json` (npm test / jest / vitest), `pyproject.toml` / `setup.py` (pytest), `Makefile`, `go.mod` (go test), etc.
-   - Identify the specific test runner command
-7. **Baseline test execution**: Run the test suite via Bash to confirm current Red state
-   - Capture test output: number of failing tests, number of passing tests
-   - If all tests already pass: warn "All tests already pass — no implementation needed. Verify this is the correct Test Suite artifact."
+Use the shared Stage 6 procedure at `skills/swe/methodology/references/agent-instructions.md` for implementation behavior.
+Use `skills/swe/methodology/references/artifact-stage-contracts.md` and `skills/swe/methodology/references/artifact-wrappers.md` for required artifact fields.
+Local shell work stays limited to packet assembly, one baseline Red-state capture, and one post-change confirmation run.
+
+| Packet element | Source | Command responsibility |
+|----------------|--------|------------------------|
+| Test Suite contract | `--artifact` or `.swe/active/05-test.md` | Resolve it first and abort if neither exists. |
+| Interface contract | `.swe/active/04-interface.md` | Read it in full when present because it defines the public boundary. |
+| Design and constraint context | `.swe/active/03-design.md` and `.swe/active/02-constrain.md` | Read summary-only at Light depth or full at Standard+ depth when present. |
+| Candidate source files | Codebase survey | Read only the files needed to recover naming, placement, and error-handling patterns. |
+| Runner command | Project manifests and existing scripts | Record the chosen command and the evidence for choosing it. |
+| Baseline Red-state evidence | One local test run | Capture exactly one pre-change run for the implementer packet and Phase 5 verification. |
+
+1. Resolve the Test Suite artifact from `--artifact` or `.swe/active/05-test.md`.
+2. Load the supporting artifacts and code patterns listed in the execution boundary table.
+3. Detect the primary runner command, capture one baseline Red-state run, and record pass or fail counts.
+4. If the baseline already passes, warn that the selected artifact may already be implemented and continue so the user can validate scope.
 
 Log: "Context gathered: {n} failing tests, {m} passing tests. Build system: {system}."
 
@@ -107,7 +102,7 @@ Log: "Context gathered: {n} failing tests, {m} passing tests. Build system: {sys
 Delegate implementation to the implementer agent via Task tool:
 
 - **Input**: Test Suite content + Interface Contracts content (if available) + Architecture Spec context (module placement, naming, data model) + existing source code patterns + depth level + build system info (test runner command) + current test output (Red state baseline)
-- **Instructions**: "Execute Procedure 2 (Implement) at {depth} depth. Make tests pass with minimal code. Maximum 3 Red-Green rounds. Follow Architecture Spec for structure (module placement, naming conventions). Use Result pattern for errors — return errors, do not throw exceptions. Prefer pure functions and immutable data. At Standard+ depth, add docstrings and type annotations. At Deep depth, add structured logging and observability. Return source code with Green state confirmation — paste test runner output after each round."
+- **Instructions**: "Follow the shared Stage 6 (Implement) procedure in `skills/swe/methodology/references/agent-instructions.md` at {depth} depth. Bind: runner_command={detected runner}, baseline_red_state={captured Phase 3 output}, architecture_context={Phase 3 summary}, interface_context={Phase 3 contract summary}. Respect the minimal-code goal, the maximum of 3 Red-Green rounds, and the Result-pattern/error-handling rules from the shared procedure. Return only the changed-file summary and the per-round Green-state evidence."
 - **Expected output**: Source code files written to the project + Green state confirmation (test runner output showing all tests pass)
 
 ### Recovery
@@ -119,9 +114,23 @@ Delegate implementation to the implementer agent via Task tool:
 | Build errors (compilation/syntax failures) | Present build error output to user. Suggest: "Check Architecture Spec compatibility or adjust test expectations. Common causes: missing dependencies, type mismatches, incorrect module paths." |
 | Test regression (previously passing tests now fail) | Log regression details. Instruct agent: "Revert the last change — a previously passing test now fails. Re-approach with a different implementation strategy." If regression persists after retry: report to user |
 
+## Output Contracts
+
+| Mode | Trigger | Payload location | Required sections or fields |
+|------|---------|------------------|-----------------------------|
+| Normal | Phase 5 verification confirms full Green state | `.swe/active/06-implement.md` via the Stage 6 wrapper at `skills/swe/methodology/references/artifact-wrappers.md` | `# Implementation: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, `## Green State`, `## Implementation Summary`, `## Files Modified`, `## Constraint Traceability`, `## Contract Delta Notes`, and `**Exit Criteria Check**`. |
+| Partial | Some tests pass but full Green state is not reached | `.swe/active/06-implement.md` via the same Stage 6 wrapper | All Normal fields plus `**Status**: Partial`, partial pass or fail counts, `Remaining Failing Tests`, and `Next Implementation Step`. |
+| Skip | Resolved depth is `Skip` for a spec-only workflow | `.swe/active/06-implement.md` | `# Implementation: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, `## Summary`, `## Skip Reason`, `## Upstream Contract Status`, and `## Next Stage Guidance`. |
+| Error | Missing Test Suite artifact or unrecoverable implementation failure | User-facing error only | `Error`, `Failed Phase`, `Blocking Condition`, `Artifact Write: none`, and `Next Command`. |
+| Composite handoff | Invoked by `/swe dev` | Same artifact as Normal, Partial, or Skip plus the Phase 6 report | Artifact path, resolved depth, final test counts, final status, next-stage command, and `See Also`. |
+
+Phase 5 writes `.swe/active/06-implement.md` only for Normal, Partial, or Skip mode.
+
 ## Phase 5: Output
 
-Source code has been written by the implementer agent during Phase 4. Now confirm and document:
+Phase 5 is a command-only confirmation pass.
+Implementation behavior stays in the shared Stage 6 procedure at `skills/swe/methodology/references/agent-instructions.md`.
+Artifact fields stay aligned to `skills/swe/methodology/references/artifact-stage-contracts.md` and `skills/swe/methodology/references/artifact-wrappers.md`.
 
 1. **Green state verification**: Run the full test suite via Bash to independently confirm results
    - This is the command's own verification — do not rely solely on the agent's assertion

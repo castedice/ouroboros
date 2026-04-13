@@ -1,8 +1,11 @@
 {
   "env": {
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "90"
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "90",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "true"
   },
   "permissions": {
+    "defaultMode": "auto",
     "allow": [
       "WebSearch",
       "WebFetch",
@@ -33,14 +36,36 @@
       "Bash(mkdir -p .tmp*)",
       "Bash(mkdir -p .swe*)",
       "Bash(mkdir -p .worktrees*)",
-      "Write(.tmp/*)"
+      "Write(.tmp/*)",
+      "Bash(qmd *)",
+      "Bash(ob *)",
+      "mcp__qmd__*"
+    ],
+    "ask": [
+      "Bash(git push *)"
     ],
     "deny": [
       "Bash(rm *)",
       "Bash(sudo *)",
-      "Bash(git push *)",
       "Bash(git reset --hard *)",
-      "Bash(git clean *)"
+      "Bash(git clean *)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(mkfs *)",
+      "Bash(dd *)",
+      "Bash(chmod 777 *)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env.*)",
+      "Write(**/.env.*)",
+      "Edit(**/.env)",
+      "Write(**/.env)",
+      "Read(**/.ssh/**)",
+      "Edit(**/.ssh/**)",
+      "Write(**/.ssh/**)",
+      "Read(**/.aws/**)",
+      "Edit(**/.aws/**)",
+      "Write(**/.aws/**)"
     ]
   }
 }

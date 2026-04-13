@@ -1,7 +1,8 @@
 ---
-description: Explore ideas through divergent and convergent thinking — generate freely, then evaluate rigorously
+name: core:brainstorm
+description: "Use when you need to generate, compare, and narrow ideas for a problem, decision, or design direction"
 argument-hint: <topic-or-question> [--framework <name>] [--output [path]] [--single]
-allowed-tools: Read, Glob, Grep, Task, Bash
+allowed-tools: Read, Glob, Write, Task, Bash
 ---
 
 # Brainstorm — Creative Exploration
@@ -16,14 +17,38 @@ Target: $ARGUMENTS
 |-------|-------|------|
 | 3 | brainstormer + Bash background (--multi) | Divergent idea generation + convergent evaluation + ranked recommendations (parallel with Codex when --multi) |
 
-## Execution Paths
+## Shared References & Payload Contracts
 
-| Flag | Phases | Behavior |
-|------|--------|----------|
-| (default) | 1, 2, 3, 5, 6 | Single-model brainstorm via Claude brainstormer agent |
-| `--framework <name>` | 1, 2, 3, 5, 6 | Use a specific process framework (double-diamond, design-thinking, cps, triz, triple-diamond). If omitted, brainstormer auto-selects |
-| `--output [path]` | 1, 2, 3, 5, 6, 7 | Save results to file. Default path: `docs/brainstorms/{date}-{topic-slug}.md`. Adds Phase 7 |
-| `--multi` | 1, 2, 3, 4, 5, 6 | Parallel Claude + Codex brainstorm, cherry-pick merge, multi-model insights section added |
+| Artifact | Path | Role |
+|----------|------|------|
+| Relay assembly contract | `skills/core/external-models/references/relay-assembly.md` | Four-section relay construction for the Codex branch |
+| Output template | `templates/core/brainstorm-output.md` | Persisted brainstorm file structure for Phase 7 |
+
+Machine-consumed payloads:
+- Claude brainstorm analysis is stored at `.tmp/{SESSION_ID}_brainstorm_claude.md`.
+- Codex `--multi` output is stored at `.tmp/{SESSION_ID}_codex_brainstorm.json`.
+- The merged multi-model result, when produced, is stored at `.tmp/{SESSION_ID}_brainstorm_merged.md`.
+- When `--output` is active, the final saved file at `{output_path}` becomes the authoritative persisted payload for downstream commands.
+
+Status-handling rules:
+- Strip any trailing completion status block per `skills/core/routing/references/completion-status-protocol.md` before counting ideas, clusters, or ranked recommendations.
+- When both conversational text and an on-disk payload exist, the on-disk payload is authoritative for Phase 4 merge work and Phase 7 save output.
+- If the Codex payload is missing or malformed, keep the Claude payload authoritative and skip multi-model merge for missing fields only.
+
+### Branch Summary
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| Topic | missing | 1 abort | Error with usage and stop |
+| `--framework <name>` | valid | 2, 3 | Load `skills/core/brainstorming/references/process-frameworks.md` and force that framework |
+| `--framework <name>` | invalid | 1, 2, 3 | Warn and fall back to brainstormer auto-selection |
+| `--single` | true | 1, 3, 4 | Skip CLI auto-detect and run Claude-only |
+| `--single` | false (default) + Codex available | 1, 3, 4 | Enable parallel Claude + Codex brainstorm and Phase 4 merge |
+| `--single` | false (default) + Codex unavailable | 1, 3 | Continue single-model and omit Phase 4 |
+| `--output [path]` | provided | 7 | Save results to the explicit path or the default brainstorm path |
+| `--output` | absent | 7 skipped | Conversational output only |
+| Scope confirmation | user adjusts scope | 2 | Revise topic, scope, or techniques before Phase 3 |
+| Scope confirmation | user approves | 3 | Launch the brainstormer with the confirmed brief |
 
 ## Phase 1: Parse Input
 
@@ -48,7 +73,7 @@ Skip if `--single` is specified.
 Verify external model infrastructure:
 
 1. Check `codex` CLI availability and version via Bash: `which codex && codex --version`
-2. Check `${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh` exists
+2. Check `${CLAUDE_PLUGIN_ROOT}/scripts/codex-relay.sh` exists
 3. Ensure `.tmp/` directory exists (create if missing)
 
 Store: `codex_available` (bool + version).
@@ -109,6 +134,16 @@ Compile gathered context into a structured brief:
 {constraints from DECISIONS.md, VISION.md, or domain knowledge}
 ```
 
+### 2.4: Scope Confirmation
+
+Present the interpreted scope to the user:
+
+```text
+Topic: {interpreted topic}. Scope: {narrow|medium|broad}. Techniques: {selected techniques}. Proceed, or adjust scope?
+```
+
+Wait for user confirmation before launching the brainstormer agent.
+
 ## Phase 3: Brainstorm
 
 > Agent: **brainstormer** + Bash background (when `--multi`)
@@ -120,7 +155,7 @@ Launch the **brainstormer** agent via Task tool:
 - **Input**: Context brief from Phase 2 + methodology reference files
 - **Instructions**: "Perform Brainstorm Analysis. Read the provided context, select appropriate divergent techniques, generate 8-15 ideas, cluster into themes, apply convergent criteria, and produce a Brainstorm Analysis Report with top 3 ranked recommendations."
 - **Framework hint** (if `--framework` specified): Append to instructions: "Use the {framework-name} process framework. Map its stages to the brainstorming workflow as described in process-frameworks.md."
-- **Expected output**: Brainstorm Analysis Report (ideas table, clusters, convergent assessment, top 3 with rationale)
+- **Expected output**: Brainstorm Analysis Report written to `.tmp/{SESSION_ID}_brainstorm_claude.md`, with ideas table, clusters, convergent assessment, and top 3 ranked recommendations.
 
 ### When `--multi` is active (parallel with Codex):
 
@@ -138,7 +173,7 @@ Launch the **brainstormer** agent via Task tool:
 
    Launch all available models simultaneously:
 
-   - **Background** (if codex_available): `Bash(invoke-model.sh codex gpt-5.2 .tmp/{SESSION_ID}_brainstorm_relay.txt .tmp/{SESSION_ID}_codex_brainstorm.json high, run_in_background=true)`
+   - **Background** (if codex_available): `Bash(codex-relay.sh .tmp/{SESSION_ID}_brainstorm_relay.txt --output .tmp/{SESSION_ID}_codex_brainstorm.json --effort high, run_in_background=true)`
    - **Foreground**: Claude brainstormer agent (same delegation as above)
 
 3. **Fan-in**: Collect background results after Claude completes. Handle exit codes per `evaluate.md` Phase 3 Step 3.
@@ -157,6 +192,16 @@ Graceful degradation:
 
 - All external models failed: proceed with Claude-only results. Note: "Multi-model: external models unavailable, proceeding with single-model results."
 - One model failed: merge available results (2-way instead of 3-way). Note which model was unavailable
+
+### Recovery
+
+| Failure | Max Retries | Stagnation Detection | Stop Behavior |
+|---------|-------------|----------------------|---------------|
+| Brainstormer timeout or malformed report | 1 | The retry still omits ideas, clusters, or ranked recommendations | Stop retrying, report the partial failure, and ask the user whether to narrow the topic |
+| Codex relay failure in `--multi` | 1 | The retry also fails, or the payload adds no unique or convergent ideas beyond Claude's result | Continue with Claude-only results and note the degraded multi-model path |
+| Merge quality drift | 0 | The merged set cannot preserve Claude's top 3, or the external payload only restates Claude ideas | Keep Claude's ranking as authoritative and surface external ideas only as optional notes |
+| Scope mismatch after confirmation | 1 clarification loop | The user rejects the revised scope twice | Stop before Phase 3 and ask for a rewritten topic or tighter scope |
+
 
 ## Phase 5: Present Results
 
@@ -238,6 +283,7 @@ models: ["{models used, e.g. claude, codex}"]
 3. **Write the file** with the full Brainstorm Analysis Report content (ideas table, clusters, convergent assessment, top 3, not-selected section)
 
 4. **Report**: "Brainstorm results saved to `{output-path}`"
+5. Treat `{output-path}` as the authoritative persisted payload for any later `/research`, `/generate`, or `/evolve` handoff.
 
 ## Rules
 

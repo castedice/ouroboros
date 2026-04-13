@@ -1,5 +1,6 @@
 ---
-description: "Stage 8 — Profile, optimize, and refactor the implementation based on measured data (TDD)"
+name: swe:optimize
+description: "Use when working code exists and you need to improve performance or simplify it based on measured evidence"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <path>]"
 allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
@@ -38,16 +39,27 @@ If `--depth` is provided, validate it is one of: Skip, Light, Standard, Deep. If
 
 ## Phase 2: Depth Decision
 
-### Execution Path
+### Branch Summary
 
-| Condition | Path |
-|-----------|------|
-| `--fast` + no performance concern in task/constraints | Skip → minimal artifact → Phase 6 |
-| `--fast` + performance concern exists | Light |
-| `--depth Skip` + no performance constraints + no quality issues | Skip → minimal artifact → Phase 6 |
-| `--depth Skip` + performance constraints or quality issues exist | Override to Light |
-| `--depth` provided (Light/Standard/Deep) | Use directly |
-| No flags | Score via `depth-system.md` |
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| `--fast` is active and neither the task nor the Constraint Profile names a performance concern | 2, 5, 6 | Take the skip path, write the minimal optimization artifact, and jump to Phase 6. |
+| `--fast` is active but a performance or simplification concern exists | 2 | Force Light depth and continue with normal optimization. |
+| Explicit `Skip` depth is requested and there are no performance constraints or quality issues | 2, 5, 6 | Take the skip path and write the minimal optimization artifact. |
+| Explicit `Skip` depth is requested but performance constraints or quality issues exist | 2 | Override Skip to Light and continue with normal optimization. |
+| Neither `--depth` nor `--fast` is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and apply stage-specific triggers. |
+| Required upstream artifacts exist | 3 | Load Constraint Profile, Architecture Spec, and Verification Report to build the optimization packet. |
+| Verification Report is missing | 3 | Warn and continue, but note that optimization is proceeding on unverified code. |
+| Full test baseline is not Green | 3 | Abort Stage 8 before any optimization work begins. |
+| Profiling tools are available | 3, 4 | Use them to collect measured before/after data. |
+| No profiling tools are available | 3, 4 | Fall back to static analysis and algorithmic complexity assessment. |
+| Implementer times out or errors | 4 | Retry once with the analysis-only fallback prompt, then stop and report the failure. |
+| Optimization introduces test regressions | 4, 5 | Require reversion to the last Green state, and abort if Green cannot be restored. |
+| Profiling reveals a fundamentally wrong algorithm | 4, 6 | Stop tuning work, report the design-level bottleneck, and recommend returning to `/swe design`. |
+| Invoked by `/swe dev` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 
 ### Depth Scoring
 

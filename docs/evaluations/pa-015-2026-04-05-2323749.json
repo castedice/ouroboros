@@ -1,0 +1,1512 @@
+{
+  "version": "1",
+  "criteria_version": "command-criteria-2026-03-30",
+  "timestamp": "2026-04-05T22:25:17+09:00",
+  "git_sha": "2bddd9b",
+  "module": "pa",
+  "eval_scope": "commands-only",
+  "components": [
+    {
+      "path": "commands/pa/agenda.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/ask.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 0,
+          "reasoning": "Codex(0): Several important branches are tabulated, but not all conditional paths are captured that way. Phase"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/brief.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/capture.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/compile.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/day.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 0,
+          "reasoning": "Codex(0): The command centralizes some shared logic in the Decision Matrix, Shared Delegation Contract, and Re"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/draft.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/focus.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/heartbeat.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/ingest.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/init.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 0,
+          "reasoning": "Codex(0): The success path has a precise Phase 10 report template, but materially distinct abort or redirect m"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/link.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/reset.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/review.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 0,
+          "reasoning": "Codex(0): The command is well organized, but it is not especially compact. The same file inventories and refer"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/specialist.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/steward.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/pa/survey.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    }
+  ],
+  "summary": {
+    "total": 17,
+    "level_distribution": {
+      "L4": 17
+    }
+  }
+}

@@ -1,5 +1,6 @@
 ---
-description: "Stage 7 — Verify implementation against acceptance criteria and architecture spec (TDD)"
+name: swe:verify
+description: "Use when implementation is complete and you need to check it against tests, acceptance criteria, and the spec"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <path>]"
 allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
@@ -47,20 +48,29 @@ Otherwise, apply the depth decision matrix from `skills/swe/methodology/referenc
 
 Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
 
-### Conditional Routing
+### Branch Summary
 
-| Condition | Depth | Action |
-|-----------|-------|--------|
-| `--fast` + all tests pass + change < 50 lines | Skip | Minimal artifact → Phase 6 |
-| `--fast` + above not met | Light | Proceed normally |
-| `--depth Skip` + trivial change fully covered by unit tests | Skip | Minimal artifact → Phase 6 |
-| `--depth Skip` + cross-component, external API, or acceptance criteria beyond unit scope | Light | Override: "Skip not applicable — task requires broader validation." |
-| `--depth` Light/Standard/Deep | As specified | Proceed normally |
-| No flags | Scored | Apply depth decision matrix from `depth-system.md` |
-
-For fast mode: check by running test suite and counting changed lines (from Implementation artifact or `git diff --stat`).
-
-For Skip validation: confirm "Trivial change fully covered by unit tests" per `depth-system.md`.
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| `--fast` is active and all tests pass with a change smaller than 50 lines | 2, 5, 6 | Take the skip path, write the minimal verification artifact, and jump to Phase 6. |
+| `--fast` is active but the fast-path checks fail | 2 | Force Light depth and continue with normal verification. |
+| Explicit `Skip` depth is requested and the change is trivial and fully covered by unit tests | 2, 5, 6 | Take the skip path and write the minimal verification artifact. |
+| Explicit `Skip` depth is requested but cross-component scope, external APIs, or broader acceptance criteria are in play | 2 | Override Skip to Light and continue with normal verification. |
+| Neither `--depth` nor `--fast` is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and apply stage-specific triggers. |
+| Required upstream artifacts exist | 3 | Load them at the depth-appropriate fidelity and build the verification packet. |
+| Some upstream artifacts are missing | 3, 4 | Continue with available artifacts, note the gaps, and instruct the agent to verify only against what exists. |
+| No upstream artifacts are available | 3, 4 | Continue from task description and codebase state only with an explicit warning. |
+| Test baseline is not Green | 3, 3.5, 4 | Warn that results may be unreliable, still run verification, and carry the warning into the report. |
+| Smoke test is inapplicable because depth is Skip, the task is docs-only, or no build system exists | 3.5 | Skip the smoke test and record the reason. |
+| Build fails during smoke test | 3.5, 4 | Record the failure and continue so the agent can account for it in the report. |
+| Implementer times out or errors | 4 | Retry once with the simplified acceptance-criteria-only fallback prompt, then stop and report the failure. |
+| Acceptance Criteria or Spec Compliance section is still missing after retry | 4, 5, 6 | Accept the partial report, mark the gaps explicitly, and continue. |
+| Verification verdict is PASS | 5, 6 | Write the normal verification artifact and recommend `/swe optimize`. |
+| Verification verdict is PARTIAL or FAIL | 5, 6 | Write the artifact with backward-transition guidance to Implement, Design, or Interface as applicable. |
+| Invoked by `/swe dev` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 
 ## Phase 3: Context Gathering
 
@@ -113,6 +123,19 @@ Delegate verification to the implementer agent via Task tool:
 | Agent timeout/error | Retry once with simplified instructions: "Check the top 3 acceptance criteria from the Context Document and report PASS/FAIL with evidence for each. Skip spec compliance and integration tests." If retry fails: report error to user |
 | Missing upstream artifacts | Log which artifacts are missing. Proceed with available artifacts. Instruct agent: "The following artifacts are unavailable: {list}. Verify only against available artifacts. Note gaps in the report." |
 | Incomplete output (missing Acceptance Criteria or Spec Compliance section) | If Acceptance Criteria section missing and Context Document was available: retry with explicit instruction to check each criterion. Otherwise: proceed with partial report and note gaps |
+
+## Output Contracts
+
+| Mode | Trigger | Payload location | Required sections or fields |
+|------|---------|------------------|-----------------------------|
+| PASS | All scoped acceptance criteria pass and no critical spec drift exists | `.swe/active/07-verify.md` via the Stage 7 wrapper at `skills/swe/methodology/references/artifact-wrappers.md` | `# Verification Report: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, `Smoke Test Results`, `Acceptance Criteria Summary`, `Spec Compliance`, `Deviations`, `Overall Verdict`, and `**Exit Criteria Check**`. |
+| PARTIAL | Some scoped criteria fail, some criteria are `OUT_OF_SCOPE`, or limited spec drift remains without a blocking failure | `.swe/active/07-verify.md` via the same Stage 7 wrapper | All PASS fields plus scoped `IN_SCOPE` / `PARTIAL` / `OUT_OF_SCOPE` markers, remaining gaps, explicit verdict `PARTIAL`, and backward-transition guidance. |
+| FAIL | Critical acceptance criteria fail, blocking spec drift remains, or build or smoke failures invalidate confidence | `.swe/active/07-verify.md` via the same Stage 7 wrapper | All PASS fields plus blocking criteria with evidence, blocking deviations or smoke-test failures, explicit verdict `FAIL`, and required recovery command. |
+| Skip | Fast-mode skip or validated Skip depth | `.swe/active/07-verify.md` | `# Verification Report: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, `## Summary`, `## Skip Reason`, `## Existing Validation Evidence`, and `## Next Stage Guidance`. |
+| Error | Parse failure or unrecoverable verification failure | User-facing error only | `Error`, `Failed Phase`, `Blocking Condition`, `Artifact Write: none`, and `Next Command`. |
+| Composite handoff | Invoked by `/swe dev` | Same artifact as PASS, PARTIAL, FAIL, or Skip plus the Phase 6 report | Artifact path, resolved depth, verdict, recommended next stage, and `See Also`. |
+
+Phase 5 writes `.swe/active/07-verify.md` only for PASS, PARTIAL, FAIL, or Skip mode.
 
 ## Phase 5: Output
 

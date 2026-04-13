@@ -1,5 +1,6 @@
 ---
-description: "Stage 4 — Define contracts between components: types, error conditions, invariants (SDD)"
+name: swe:interface
+description: "Use when you need to define contracts between components, including types, invariants, and error handling"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <architecture-spec-path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
@@ -35,17 +36,28 @@ Validate `--depth` if provided. If invalid: error and abort.
 
 ## Phase 2: Depth Decision
 
-If `--depth` was provided, use directly. Log: "Depth override: {depth}."
+### Branch Summary
 
-Otherwise, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md`:
-
-1. Score 5 factors, sum (5-15), map to depth
-2. Check stage-specific minimum depth triggers:
-   - Standard for any public API or cross-team contract
-3. Check escalation rules (2+ teams depend on changed interfaces escalates Interface)
-
-Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
-
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| `--fast` is active and the change stays within one module boundary with no public contract changes | 2, 5, 6 | Take the skip path, write the minimal interface artifact, and jump to Phase 6. |
+| `--fast` is active but exported signatures, types, or schemas change | 2 | Force Light depth and continue with normal analysis. |
+| Explicit `Skip` depth is requested and the task is internal refactoring only | 2, 5, 6 | Take the skip path and write the minimal interface artifact. |
+| Explicit `Skip` depth is requested but new public APIs, changed signatures, or new schemas appear | 2 | Override Skip to Light and continue with normal analysis. |
+| Neither `--depth` nor `--fast` is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and apply stage-specific triggers. |
+| `--artifact` is provided and readable | 3 | Load the Architecture Spec and use it as the primary contract source. |
+| `--artifact` is provided but missing | 3 | Warn and continue without Architecture Spec context. |
+| Prior Stage 1 or Stage 2 artifacts exist | 3 | Load them at summary-only Light depth or full Standard+ depth to inform naming and SLA contracts. |
+| No Architecture Spec is available from `--artifact` or `.swe/active/03-design.md` | 3 | Continue from existing codebase patterns and warn that contract alignment may drift. |
+| `docs/specs/project/interfaces.md` exists | 4 | Include its `## Summary` in the analyst input packet. |
+| Analyst times out or errors | 4 | Retry once with the simplified Light-depth fallback prompt, then stop and report the failure. |
+| Output contains `any` or untyped public structures | 4 | Retry once with explicit precision requirements. |
+| Interfaces are still not testable without implementation | 4 | Retry once with explicit testability instructions, then stop and report the gap if it remains. |
+| Command is invoked standalone | 5, 6 | Present the artifact review checkpoint before the final report. |
+| Command is invoked by `/swe spec` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 ### Fast Mode Skip
 
 When `fast_mode` is active (from `--fast` flag), apply relaxed skip condition: **Skip when the change is within a single module boundary with no public interface changes**. If the task modifies only internal implementation without changing any exported function signatures, types, or event schemas, produce a minimal skip artifact noting "Interface skipped — change within single module boundary" and jump to Phase 6. Otherwise, proceed at Light depth.
@@ -89,11 +101,25 @@ Delegate interface definition to the analyst agent via Task tool:
 
 ### Recovery
 
-| Failure | Action |
-|---------|--------|
-| Agent timeout/error | Retry once: "Produce Light-depth Interface Contracts: function signatures with type annotations and docstrings." If retry fails: report error |
-| Missing type precision (uses `any` or untyped) | Retry with instruction: "Replace all `any` types and untyped structures with precise type definitions." |
-| Non-testable interfaces | Log warning. Retry with instruction: "Ensure each interface can be tested without implementation — add input/output examples." |
+Recovery is bounded to 2 analyst attempts total per invocation: the initial run plus 1 retry.
+
+| Failure | Max Retries | Stagnation Detection | Stop Behavior |
+|---------|-------------|----------------------|---------------|
+| Agent timeout or error | 1 | The retry also times out or returns another execution error. | Retry once with the Light-depth fallback prompt, then report failure and do not write an artifact. |
+| Missing type precision (`any` or untyped structures) | 1 | The retry still contains `any`, untyped dictionaries, or other imprecise public types. | Retry once with explicit precision requirements, then stop and surface the blocking gap to the user. |
+| Non-testable interfaces | 1 | The retry still requires implementation knowledge to write or run contract tests. | Retry once with explicit testability instructions, then stop and recommend returning to Stage 3. |
+| Missing Delta from Design section | 1 | The retry still omits signature or type changes from the Architecture Spec. | Retry once with an explicit Delta requirement, then stop and report the artifact as incomplete. |
+
+## Output Contracts
+
+| Mode | Trigger | Payload location | Required sections or fields |
+|------|---------|------------------|-----------------------------|
+| Normal | Phase 4 completes with a non-skip result | `.swe/active/04-interface.md` | `# Interface Contracts: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, analyst body, and `**Exit Criteria Check**`. |
+| Skip | Fast-mode skip or validated Skip depth | `.swe/active/04-interface.md` | `# Interface Contracts: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, `## Summary`, `## Skip Reason`, `## Existing Interface Boundary`, and `## Next Stage Guidance`. |
+| Error | Parse failure or unrecoverable analyst failure | User-facing error only | `Error`, `Failed Phase`, `Blocking Condition`, `Artifact Write: none`, and `Next Command`. |
+| Composite handoff | Invoked by `/swe spec` | Same artifact as Normal or Skip plus the Phase 6 report | Artifact path, resolved depth, contract-chain completion status, next-stage command, and `See Also`. |
+
+Phase 5 writes `.swe/active/04-interface.md` only for Normal or Skip mode.
 
 ## Phase 5: Output
 

@@ -1,5 +1,6 @@
 ---
-description: "Stage 1 — Analyze requirements, model the problem domain, and survey existing code (DDD)"
+name: swe:understand
+description: "Use when you need to clarify requirements, domain concepts, and existing code before making design decisions"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
@@ -41,31 +42,23 @@ If `--depth` is provided, validate it is one of: Skip, Light, Standard, Deep. If
 
 **Precedence**: `--depth` always overrides `--fast`. When both are present, `--depth` wins.
 
-| Condition | Depth |
-|-----------|-------|
-| `--depth` provided | Use that value directly. Log: "Depth override: {depth}." |
-| `--fast` provided (no `--depth`) | Set depth to Light. Log: "Fast mode: depth set to Light." |
-| Neither | Apply depth decision matrix below |
+### Branch Summary
 
-When neither flag is provided, apply the depth decision matrix from `skills/swe/methodology/references/depth-system.md`:
-
-1. Score 5 factors (Task Scope, Risk Level, Domain Familiarity, Team Impact, Reversibility) based on the task description and codebase signals
-2. Sum scores (range 5-15) and map to depth level:
-
-| Score | Depth |
-|-------|-------|
-| 5-6 | Light |
-| 7-10 | Standard |
-| 11-15 | Deep |
-
-3. Check stage-specific minimum depth triggers from `depth-system.md`:
-   - Deep when domain terms are unstable or requirements conflict
-4. Check escalation rules (security/compliance, migration size, etc.)
-
-Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
-
-If depth is **Skip**: Log "Stage 1 (Understand) cannot be skipped per pipeline rules — Understand is always required. Defaulting to Light." Set depth to Light.
-
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth. |
+| Neither `--depth` nor `--fast` is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md`. |
+| Resolved depth is `Skip` | 2 | Override Skip to Light because Stage 1 is mandatory. |
+| Relevant files are found | 3 | Build the analyst context from those files and related modules. |
+| No relevant files are found | 3 | Continue as greenfield analysis with a warning. |
+| `--artifact` is provided | 3 | Read it as optional iteration context. |
+| `docs/specs/project/domain.md` exists | 4 | Include its `## Summary` in the analyst input packet. |
+| Analyst times out or errors | 4 | Retry once with the simplified Light-depth fallback prompt, then stop and report the failure. |
+| Required sections remain missing after retry | 4, 5, 6 | Accept the partial artifact only when Problem Statement and Success Criteria are present; otherwise stop and report the gap. |
+| Invoked by `/swe spec` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 ## Phase 3: Context Gathering
 
 Survey the codebase to build analysis context:

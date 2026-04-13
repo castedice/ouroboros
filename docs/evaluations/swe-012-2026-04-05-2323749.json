@@ -1,0 +1,1248 @@
+{
+  "version": "1",
+  "criteria_version": "command-criteria-2026-03-30",
+  "timestamp": "2026-04-05T22:25:17+09:00",
+  "git_sha": "2323749",
+  "module": "swe",
+  "eval_scope": "commands-only",
+  "components": [
+    {
+      "path": "commands/swe/constrain.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/design.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 0,
+          "reasoning": "Codex(0): The normal output paths are precisely templated, but the skip path is not. The branch table says `--"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/dev.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 0,
+          "reasoning": "Codex(0): Major branches are documented in the `Branch Summary` and recovery tables, but several consequential"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 0,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/implement.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 0,
+          "reasoning": "Codex(0): The consolidated `Branch Summary` table is strong for depth, artifacts, retries, and outcomes, but t"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/interface.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/optimize.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 0,
+          "reasoning": "Codex(0): The normal Phase 5 review output and Phase 6 completion report are well templated, but the `skip pat"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/reverse.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/ship.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 0,
+          "reasoning": "Codex(0): The command provides a strong main report template, but not every materially distinct output mode is"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 0,
+          "reasoning": "Claude(0): E2 duplication"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/spec.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 0,
+          "reasoning": "Codex(0): Although it centralizes shared logic in the Stage Orchestration Contract and Shared Stage Execution "
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/spiral.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 0,
+          "reasoning": "Codex(0): Several outputs are well templated, but materially distinct failure modes are still underspecified b"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/test.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 0,
+          "reasoning": "Codex(0): The normal Phase 5 and Phase 6 outputs are well templated, but distinct branches such as \"Test frame"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/tune.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 0,
+          "reasoning": "Claude(0): E2 duplication"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/understand.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    },
+    {
+      "path": "commands/swe/verify.md",
+      "type": "command",
+      "level": 4,
+      "criteria": [
+        {
+          "name": "F1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "F5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q4",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q5",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q6",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "Q7",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E1",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E2",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E3",
+          "score": 1,
+          "reasoning": "consensus"
+        },
+        {
+          "name": "E4",
+          "score": 1,
+          "reasoning": "consensus"
+        }
+      ],
+      "multi_model": true
+    }
+  ],
+  "summary": {
+    "total": 14,
+    "level_distribution": {
+      "L4": 14
+    }
+  }
+}

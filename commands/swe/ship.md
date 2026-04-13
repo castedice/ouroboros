@@ -1,5 +1,6 @@
 ---
-description: "Ship composite — orchestrate Integration Test, Security Review, Code Review, and Deploy Readiness to validate code for production"
+name: swe:ship
+description: "Use when implementation is complete and you need a production-readiness review across testing, security, and code quality"
 argument-hint: "<task-description> [--fast] [--depth <global|per-stage>] [--artifact <path>] [--single]"
 allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
@@ -16,6 +17,19 @@ Target: $ARGUMENTS
 |-------|-------|------|
 | 3 | implementer | Integration and e2e test execution |
 | 4 | reviewer × 2 | Security Review ‖ Code Review (parallel Tasks at Standard+ depth) |
+
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass review artifact paths, dependency manifests, and inline source context on every call.
+Use named return payloads rather than prose-only summaries.
+The command owns test execution, fan-out coordination, consensus, and report persistence.
+Internal calls use `Agent(subagent_type: "ouroboros:swe:implementer")` and `Agent(subagent_type: "ouroboros:swe:reviewer")`.
+
+| Agent | Phases | Input | Expected Output |
+|-------|--------|-------|-----------------|
+| `ouroboros:swe:implementer` | 3 | `task`, `depth_level`, entry artifact summary, source paths, test runner config, and suite inventory | `integration_results`, `suite_statuses[]`, and `coverage_note` |
+| `ouroboros:swe:reviewer` | 4 | `source_paths`, `dependency_manifests`, `depth_level`, and upstream artifacts when code review is enabled | `security_findings[]`, `code_findings[]`, `severity_classification`, `accepted_strengths[]`, `required_revisions[]`, and optional `unresolved_questions[]` |
 
 ## Phase 1: Parse Input
 
@@ -73,17 +87,51 @@ Log availability:
 - Codex found: "Multi-model: Claude + Codex v{ver}"
 - Codex not found: "Single-model mode (no external CLIs found)"
 
-### Decision Matrix
+### Mode Detection
 
-| Condition | Integration | Security Review | Code Review | Deploy | Multi-Model |
-|-----------|------------|-----------------|-------------|--------|-------------|
-| Standard (default) | Run | Run | Run | Standard checklist | Off |
-| `--fast` / Light | Run | Run | **Skip** | Light checklist | Off |
-| Deep | Run | Run (Deep) | Run (Deep) | Deep checklist | Off |
-| `--multi` | Run | Run + Codex | Run + Codex | Standard checklist | 2×2 grid |
-| `--multi` + Light | Run | Run + Codex | **Skip** | Light checklist | Security only |
-| No tests found | Skip (warn) | Run | Run | No test data | — |
-| P1 findings | — | — | — | **BLOCKED** | — |
+Verify the operating mode from repository state before Phase 2 so the command does not rely on flags alone.
+
+1. Verify the resolved entry artifact exists and is readable before building the review packet.
+2. Verify at least one source directory or source file exists for the task scope, or abort because Ship cannot review artifact-only state.
+3. Detect integration coverage mode from repository state.
+   - If a runnable test command and integration or e2e suites exist, Integration Test runs normally.
+   - If only unit tests exist, Integration Test uses the available suite and records reduced coverage.
+   - If no runnable tests exist, Integration Test is skipped with warning and Ship continues to reviews.
+4. Detect security scope from manifests and source files.
+   - If dependency manifests exist, Security Review includes dependency audit plus source scanning.
+   - If no manifests exist, Security Review falls back to source-only secret and unsafe-pattern scanning.
+5. Detect multi-model mode from executable state, not user intent alone.
+   - `--single` forces single-model mode.
+   - Otherwise require both `codex` CLI availability and a writable `.tmp/{SESSION_ID}_*` directory before enabling Codex fan-out.
+   - If either prerequisite fails, fall back to single-model mode and log the reason.
+
+### Branch Summary
+
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not continue. |
+| `--artifact` is provided | 1 | Use that artifact as the entry point after verifying it exists and is readable. |
+| No entry artifact can be resolved from `--artifact`, `08-optimize.md`, or `06-implement.md` | 1 | Abort with the missing-artifact error. |
+| `--single` is present | 1, 4, 6 | Force single-model mode and skip Codex fan-out. |
+| Codex CLI or writable temp directory is unavailable | 1, 4, 6 | Fall back to single-model mode even without `--single`. |
+| `--depth` is provided | 2 | Use the parsed global or per-stage depths. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth across stages and enable relaxed skip conditions. |
+| Neither `--depth` nor `--fast` is provided | 2 | Build the default per-stage depth plan from repository and task characteristics. |
+| Integration suites are available | 3 | Run Integration Test normally. |
+| No runnable integration or test suites exist | 3 | Skip Integration Test with warning and continue to reviews. |
+| Integration build fails | 3 | Abort Ship before the review stages. |
+| Standard+ depth is active | 4 | Run Security Review and Code Review in parallel. |
+| Light depth is active | 4 | Run Security Review only and skip Code Review. |
+| `--multi` effective mode is active at Standard+ depth | 4, 6 | Add Codex Security Review and Codex Code Review to the parallel fan-out. |
+| `--multi` effective mode is active at Light depth | 4, 6 | Add Codex Security Review only. |
+| No dependency manifests are found | 4 | Reduce Security Review to source-only scanning. |
+| No source code files are identified | 4 | Abort because there is nothing to review. |
+| Security Review or Code Review fails once | 4 | Retry once with the simplified fallback scope for that review. |
+| Both review tasks fail after retries | 4, 5 | Continue to Deploy Readiness with empty findings and a warning. |
+| Phase 5 detects one or more P1 findings | 5, 6, 7 | Mark Ship as BLOCKED and do not advance to deployment. |
+| Phase 5 detects zero P1 findings | 5, 6, 7 | Mark Ship as CLEAR and produce the deploy checklist. |
+| Deploy automation exists | 5 | Present the deploy command and require explicit user confirmation before execution. |
+| No deploy automation exists | 5, 6 | Present the checklist only and mark deployment as manual. |
 
 ## Phase 2: Depth Planning
 
@@ -182,8 +230,8 @@ When `--multi` is active, launch Codex background reviews alongside Claude Tasks
 1. **Build relay prompts**: Construct Security Review and Code Review relay prompts using templates from `skills/swe/methodology/references/swe-relay-prompts.md`. Save to `.tmp/{SESSION_ID}_security_relay.txt` and `.tmp/{SESSION_ID}_review_relay.txt`.
 
 2. **Fan-out** (4 concurrent evaluations per `skills/core/routing/references/parallel-execution-pattern.md`):
-   - Background 1: Codex Security Review via `scripts/invoke-model.sh` (relay → `_codex_security.json`)
-   - Background 2: Codex Code Review via `scripts/invoke-model.sh` (relay → `_codex_review.json`)
+   - Background 1: Codex Security Review via `scripts/codex-relay.sh` (relay → `_codex_security.json`)
+   - Background 2: Codex Code Review via `scripts/codex-relay.sh` (relay → `_codex_review.json`)
    - Task 1: Claude Security Review (reviewer agent — same as single-model)
    - Task 2: Claude Code Review (reviewer agent — same as single-model)
 

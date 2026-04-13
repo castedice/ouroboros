@@ -1,0 +1,281 @@
+{
+  "schema_version": "rnd-meta-aggregate.v1",
+  "artifact": "meta-aggregate.json",
+  "producer_stage": "meta-analyze",
+  "updated_at": "",
+  "study_count": 0,
+  "study_ids": [],
+  "budget_utilization_distribution": {
+    "wall_clock": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "web_search": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "web_fetch": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "model_route": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "probes": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    }
+  },
+  "stage_time_distribution": {
+    "scope": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "prior-work": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "perspectives": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "hypotheses": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "experiment-design": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "probes": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "analyze-prune": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "report": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "review": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "meta-learn": {
+      "seconds": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "fraction": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    }
+  },
+  "quality_distribution": {
+    "scores": {
+      "C1": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "C2": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "C3": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "C4": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      },
+      "C5": {
+        "mean": null,
+        "min": null,
+        "max": null,
+        "values": []
+      }
+    },
+    "verdicts": {}
+  },
+  "efficiency_trends": {
+    "probes_per_claim": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "sources_per_claim": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "sources_per_probe": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "successful_probe_rate": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "partial_or_better_probe_rate": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "probe_type_performance": {}
+  },
+  "process_patterns": {
+    "loopbacks_used": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "critic_revision_fires": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "budget_exhaustion_frequency": {},
+    "stage_duration_sources": {}
+  },
+  "meta_learning_patterns": {
+    "lesson_count": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "deferred_change_count": {
+      "mean": null,
+      "min": null,
+      "max": null,
+      "values": []
+    },
+    "deferred_change_frequency": {}
+  }
+}

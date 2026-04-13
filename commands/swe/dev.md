@@ -1,5 +1,6 @@
 ---
-description: "Development composite — orchestrate Stages 5-8 (Test, Implement, Verify, Optimize) to produce working code from interface contracts"
+name: swe:dev
+description: "Use when you already have a specification and need one command to drive it to working, verified code"
 argument-hint: "<task-description> [--fast] [--depth <global|per-stage>] [--artifact <interface-contracts-path>]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Task, Bash
 ---
@@ -18,6 +19,21 @@ Target: $ARGUMENTS
 | 4 | implementer | Stage 6 — Code implementation (TDD Green Phase) |
 | 5 | implementer | Stage 7 — Acceptance and spec verification |
 | 6 | implementer | Stage 8 — Profiling and refactoring |
+
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass implementer artifact paths, repo survey outputs, and inline contents on every call.
+Use named return payloads rather than prose-only summaries.
+The command owns code writes, Bash verification, and artifact persistence.
+Internal implementer calls use `Agent(subagent_type: "ouroboros:swe:implementer")`.
+
+| Agent | Phases | Input | Expected Output |
+|-------|--------|-------|-----------------|
+| `ouroboros:swe:implementer` | 3 | `task`, `depth_level`, `interface_contracts`, `upstream_artifacts`, and repo test-pattern survey | `test_suite`, `test_inventory`, and optional `unresolved_questions[]` |
+| `ouroboros:swe:implementer` | 4 | `task`, `depth_level`, `test_suite`, `interface_contracts`, `upstream_artifacts`, code-pattern survey, and Red-state baseline | `implementation_patchset`, `green_state`, and optional `unresolved_questions[]` |
+| `ouroboros:swe:implementer` | 5 | `task`, `depth_level`, full artifact chain, source paths, and Bash verification context | `verification_report`, `verification_verdict`, `accepted_strengths[]`, `required_revisions[]`, and optional `unresolved_questions[]` |
+| `ouroboros:swe:implementer` | 6 | `task`, `depth_level`, source paths, performance constraints, verification context, and test baseline | `optimization_report`, `optimization_patchset`, `green_state`, and optional `unresolved_questions[]` |
 
 ## Phase 1: Parse Input
 
@@ -59,9 +75,32 @@ If `--artifact` is not provided: check for `.swe/active/04-interface.md` as the 
 
 If no Interface Contracts artifact found:
 
+### Branch Summary
+
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not continue. |
+| `--depth` format, stage abbreviation, or depth value is invalid | 1 | Abort with the validation error and do not continue. |
+| `--artifact` is provided and readable | 1 | Use it as the Interface Contracts entry artifact. |
+| No Interface Contracts artifact can be resolved | 1 | Abort because Dev requires Stage 4 output. |
+| `--depth` is provided | 2 | Use the parsed global or per-stage depths. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth across Stage 5-8 and enable relaxed skip behavior. |
+| Neither `--depth` nor `--fast` is provided | 2 | Build the per-stage depth plan from `skills/swe/methodology/references/depth-system.md`. |
+| Stage 5 succeeds | 3-8 | Continue to Stage 6 with `.swe/active/05-test.md`. |
+| Stage 5 fails after one retry | 3 | Abort the composite because implementation cannot proceed without tests. |
+| Stage 6 reaches full Green state | 4-8 | Continue normally to Stage 7. |
+| Stage 6 is partial and the user or composite policy allows continuation | 4-8 | Continue to Stage 7 with the partial state documented. |
+| Stage 6 is partial and the user chooses to stop | 4 | Abort after preserving Stage 5-6 artifacts. |
+| Stage 6 fails after retry | 4-8 | Preserve completed Stage 5 artifacts, report the failure, and stop unless the user explicitly continues. |
+| Stage 7 returns PASS | 5-8 | Continue to Stage 8 normally. |
+| Stage 7 returns PARTIAL | 5-8 | Continue to Stage 8 with partial-state warnings. |
+| Stage 7 returns FAIL on critical criteria and the user does not approve continuation | 5 | Stop and recommend `/swe implement`. |
+| Stage 8 succeeds | 6-8 | Present the full Test → Implement → Verify → Optimize chain. |
+| Stage 8 fails after retry | 6-8 | Preserve Stages 5-7 artifacts, mark Optimize as failed, and continue to final review/report. |
+
+
 - Output: "Error: Interface Contracts artifact required. Run `/swe interface` or `/swe spec` first, or provide `--artifact <path>`."
 - Abort
-
 ## Phase 2: Depth Planning
 
 1. If `--depth` was provided, use parsed values
@@ -97,6 +136,19 @@ Log the Depth Plan. Present to user for confirmation:
 Proceed with this plan, or adjust depths?
 ```
 
+## Stage Execution Pattern
+
+Stages 5-8 follow the same orchestration loop.
+Use this shared pattern, then apply the stage-specific bindings in each phase below.
+
+| Step | Shared Action |
+|------|---------------|
+| 1 | Load the stage input artifact from `.swe/active/` plus the repo survey data needed for the stage |
+| 2 | Delegate to `agents/swe/implementer.md` using the matching stage instructions from `skills/swe/methodology/references/agent-instructions.md` |
+| 3 | Run the stage-local Bash verification command to confirm the required state transition |
+| 4 | Write the stage artifact to `.swe/active/{NN}-{stage}.md` |
+| 5 | Classify the stage verdict, apply the stage recovery table, and either continue or stop per Branch Summary |
+
 ## Phase 3: Stage 5 — Test (TDD Red Phase)
 
 Execute the Test stage by delegating to the implementer agent:
@@ -106,6 +158,8 @@ Execute the Test stage by delegating to the implementer agent:
 - **Input**: Task description + Interface Contracts content + upstream artifacts (Context Document for success criteria, Constraint Profile for performance thresholds, Architecture Spec for component structure) + existing test patterns (framework, naming convention, directory layout) + depth level for Test
 - **Instructions**: Follow the Stage 5 (Test) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth. Bind: framework={framework}.
 - **Expected output**: Test code (one or more files) + test inventory table
+
+Use the shared Stage Execution Pattern above with the Stage 5 bindings in this section.
 
 1. Survey codebase for test patterns and detect test framework (same as test.md Phase 3)
 2. Read Interface Contracts from the resolved artifact path
@@ -138,6 +192,8 @@ Execute the Implement stage, passing the Test Suite forward:
 - **Input**: Task description + Test Suite content + Interface Contracts content + Architecture Spec context (module placement, naming, data model) + existing source code patterns + depth level for Implement + build system info + current test output (Red state baseline)
 - **Instructions**: Follow the Stage 6 (Implement) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Source code files + Green state confirmation (test runner output)
+
+Use the shared Stage Execution Pattern above with the Stage 6 bindings in this section.
 
 1. Read the Test Suite artifact from Phase 3 output
 2. Survey existing source code for patterns and conventions (same as implement.md Phase 3)
@@ -174,6 +230,8 @@ Execute the Verify stage, passing the Implementation forward:
 - **Input**: Task description + full artifact chain content (Context Document, Constraint Profile, Architecture Spec, Interface Contracts, Test Suite, Implementation summary) + source code file paths + test baseline results + depth level for Verify
 - **Instructions**: Follow the Stage 7 (Verify) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth. Bind: build_status and exec_status from smoke test results.
 - **Expected output**: Verification Report content (acceptance criteria checklist, spec compliance, deviation documentation)
+
+Use the shared Stage Execution Pattern above with the Stage 7 bindings in this section.
 
 1. Gather the full artifact chain from `.swe/active/` (same as verify.md Phase 3)
 2. Run existing test suites via Bash to confirm Green baseline
@@ -213,6 +271,8 @@ Execute the Optimize stage, passing the Verification Report forward:
 - **Input**: Source code file list + Constraint Profile content (performance constraints) + Architecture Spec content (algorithm rationale) + Verification Report + test baseline output + available profiling tools + depth level for Optimize
 - **Instructions**: Follow the Stage 8 (Optimize) instruction template from `skills/swe/methodology/references/agent-instructions.md` at the planned depth.
 - **Expected output**: Optimization Report content + modified source code
+
+Use the shared Stage Execution Pattern above with the Stage 8 bindings in this section.
 
 1. Survey codebase for optimization candidates and identify profiling tools (same as optimize.md Phase 3)
 2. Run full test suite via Bash to establish Green baseline

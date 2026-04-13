@@ -1,0 +1,128 @@
+{
+  "schema_version": "rnd-study-metrics.v1",
+  "study_id": "",
+  "artifact": "study-metrics.json",
+  "producer_stage": "meta-learn",
+  "updated_at": "",
+  "question": "",
+  "mode": "literature-only",
+  "study_path": "",
+  "completed_at": "",
+  "budget": {
+    "wall_clock": {
+      "used": 0,
+      "limit": 0,
+      "utilization": 0
+    },
+    "web_search": {
+      "used": 0,
+      "limit": 0,
+      "utilization": 0
+    },
+    "web_fetch": {
+      "used": 0,
+      "limit": 0,
+      "utilization": 0
+    },
+    "model_route": {
+      "used": 0,
+      "limit": 0,
+      "utilization": 0
+    },
+    "probes": {
+      "used": 0,
+      "limit": 0,
+      "utilization": 0
+    }
+  },
+  "stage_durations": {
+    "source": "",
+    "total_seconds": 0,
+    "stages": {
+      "scope": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "prior-work": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "perspectives": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "hypotheses": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "experiment-design": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "probes": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "analyze-prune": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "report": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "review": {
+        "seconds": 0,
+        "fraction": 0
+      },
+      "meta-learn": {
+        "seconds": 0,
+        "fraction": 0
+      }
+    }
+  },
+  "resource_efficiency": {
+    "planned_probe_count": 0,
+    "executed_probe_count": 0,
+    "success_count": 0,
+    "partial_count": 0,
+    "failure_count": 0,
+    "unknown_count": 0,
+    "success_rate": 0,
+    "partial_rate": 0,
+    "failure_rate": 0,
+    "probe_types": {}
+  },
+  "quality": {
+    "verdict": null,
+    "scores": {
+      "C1": null,
+      "C2": null,
+      "C3": null,
+      "C4": null,
+      "C5": null
+    },
+    "mean_score": null
+  },
+  "derived_ratios": {
+    "claim_count": 0,
+    "source_count": 0,
+    "probe_count": 0,
+    "probes_per_claim": null,
+    "sources_per_claim": null,
+    "sources_per_probe": null,
+    "successful_probe_rate": null,
+    "partial_or_better_probe_rate": null
+  },
+  "meta_learning": {
+    "lesson_count": 0,
+    "lesson_ids": [],
+    "deferred_change_count": 0,
+    "deferred_change_ids": []
+  },
+  "process_signals": {
+    "loopbacks_used": 0,
+    "critic_revision_fires": 0,
+    "budget_exhausted_dimensions": []
+  }
+}

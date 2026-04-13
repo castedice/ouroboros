@@ -1,5 +1,6 @@
 ---
-description: "Stage 2 — Enumerate constraints and design boundaries using constraint-first methodology (SDD)"
+name: swe:constrain
+description: "Use when you need to identify constraints, risks, and design boundaries before choosing a solution"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <context-document-path>]"
 allowed-tools: Read, Glob, Grep, Write, Task
 ---
@@ -41,14 +42,26 @@ If `--depth` is provided, validate against: Skip, Light, Standard, Deep. If inva
 
 ### Branch Summary
 
-| Condition | Depth | Skip? | Notes |
-|-----------|-------|-------|-------|
-| `--depth` provided (with or without `--fast`) | Explicit value | Per skip rules below | `--depth` always overrides `--fast` |
-| `--fast` only, single-file + no ext deps | Light | **Yes** — relaxed skip | Minimal skip artifact → Phase 6 |
-| `--fast` only, multi-file or ext deps | Light | No | Proceed normally at Light |
-| Neither flag | Matrix-decided | Per skip rules below | Score 5 factors → depth |
-| Depth = Skip, pure refactoring | Skip | **Yes** | Minimal artifact → Phase 6 |
-| Depth = Skip, new functionality | Light | No | Skip overridden: new constraints exist |
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--depth` is provided | 2 | Use the explicit depth and skip automatic scoring. |
+| `--fast` is provided without `--depth` | 2 | Force Light depth and enable relaxed skip evaluation. |
+| Neither `--depth` nor `--fast` is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and map the sum to Light, Standard, or Deep. |
+| Resolved depth is `Skip` and the task is pure refactoring with no new constraints | 2, 5, 6 | Write the minimal skip artifact to `.swe/active/02-constrain.md` and jump to Phase 6. |
+| Resolved depth is `Skip` but the task adds new functionality, requirements, or interfaces | 2 | Override Skip to Light and continue with normal analysis. |
+| `--fast` is active and the change is single-file with no external dependencies | 2, 5, 6 | Use the fast-mode skip path and produce the minimal skip artifact. |
+| `--fast` is active but the change spans multiple files or external dependencies | 2 | Stay at Light depth and continue with normal analysis. |
+| `--artifact` is provided and readable | 3 | Load the Context Document and resolve Stage 1 open questions during analysis. |
+| `--artifact` is provided but missing or unreadable | 3 | Warn and continue without upstream context. |
+| No `--artifact` is provided | 3 | Continue with task-only context and recommend `/swe understand` for better coverage. |
+| `docs/specs/project/constraints.md` exists | 4 | Include its `## Summary` in the analyst input packet. |
+| Analyst times out or errors | 4 | Retry once with the simplified Light-depth fallback prompt, then stop and report the failure. |
+| Standard+ output covers fewer than 6 categories | 4 | Retry once with explicit six-category coverage instructions; Light depth may accept partial coverage. |
+| Analyst identifies no constraints | 4 | Warn that the task may be a pure refactoring and continue with the reduced artifact. |
+| Command is invoked standalone | 5, 6 | Present the artifact review checkpoint before the final report. |
+| Command is invoked by `/swe spec` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 
 ### Depth Resolution
 
@@ -106,6 +119,17 @@ Delegate constraint enumeration to the analyst agent via Task tool:
 | Agent timeout/error | Retry once: "Produce a Light-depth Constraint Profile: bullet list of 3-5 dominant constraints with Hard/Soft classification." If retry fails: report error |
 | Missing categories (fewer than 6 evaluated) | Log gap. If Standard+ depth: retry with explicit instruction to cover all 6. If Light: accept partial coverage |
 | No constraints identified | Log warning: "No constraints found — verify this is a pure refactoring task. If not, consider `/swe understand` first for better context." |
+
+## Output Contracts
+
+| Mode | Trigger | Payload location | Required sections or fields |
+|------|---------|------------------|-----------------------------|
+| Normal | Phase 4 completes with a non-skip result | `.swe/active/02-constrain.md` | `# Constraint Profile: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, analyst body, and `**Exit Criteria Check**`. |
+| Skip | Fast-mode skip or validated Skip depth | `.swe/active/02-constrain.md` | `# Constraint Profile: {task summary}`, `**Stage**`, `**Depth**`, `**Task**`, `**Upstream**`, `**Date**`, `## Summary`, `## Skip Reason`, `## Constraint Carry-Forward`, and `## Next Stage Guidance`. |
+| Error | Parse failure or unrecoverable analyst failure | User-facing error only | `Error`, `Failed Phase`, `Blocking Condition`, `Artifact Write: none`, and `Next Command`. |
+| Composite handoff | Invoked by `/swe spec` | Same artifact as Normal or Skip plus the Phase 6 report | Artifact path, resolved depth, category coverage, next-stage command, and `See Also`. |
+
+Phase 5 writes `.swe/active/02-constrain.md` only for Normal or Skip mode.
 
 ## Phase 5: Output
 

@@ -1,149 +1,106 @@
 ---
 name: research-methodology
 description: This skill provides research methodology knowledge. It should be activated when an agent needs to "evaluate source credibility", "synthesize findings from multiple sources", "structure knowledge for reuse", "extract patterns from collected content", or "cross-reference research against existing knowledge".
+summary: Guides scoped research from source collection through credibility evaluation, cross-source synthesis, and reusable knowledge structuring.
+version: 1
+tags: [core, methodology, research, synthesis, source-evaluation]
+preamble_tier: 3
 ---
 
 # Research Methodology
 
-## Core Principle
+## Core Rule
 
 **"Collect broadly, synthesize deeply, structure for reuse."**
 
-Research is a three-phase process: collection gathers raw material, synthesis extracts meaning, and structuring makes it actionable. Skipping synthesis produces data dumps — skipping structuring produces insights that cannot be found or applied later. The full pipeline is: **Scope → Collect → Evaluate → Synthesize → Structure**.
+Research is a five-stage pipeline: **Scope → Collect → Evaluate → Synthesize → Structure**.
+Collection without synthesis is a data dump, and synthesis without structure creates insights that cannot be found or reused later.
+Good research produces cross-source understanding, not a stack of per-source summaries.
 
-The critical transition is from collection to synthesis. A researcher who collects 20 sources but produces a list of summaries has done collection twice, not research. Synthesis requires identifying patterns across sources, resolving contradictions, and mapping findings to the target domain — work that no single source can provide.
+## Gotchas
 
-## Research Workflow
+| Risk | Stage | Prevention |
+|------|-------|------------|
+| Collecting only easy secondary sources | Collection | Prefer primary sources first and go past the first obvious results |
+| Stopping at three summaries | Synthesis | Produce cross-source patterns, contradictions, and gaps |
+| Letting one source dominate the result | Collection | Keep key claims triangulated and avoid any single source contributing most findings |
+| Treating prestige as proof | Evaluation | Judge evidence quality, not just source reputation |
+| Discarding older but still-relevant sources | Evaluation | Check whether the topic is actually freshness-sensitive |
+| Letting reading order drive the conclusion | Synthesis | Synthesize from notes, not from memory of the first source |
+| Hiding contradictions to keep the narrative tidy | Synthesis | Treat contradictions between credible sources as findings that require explanation |
+| Publishing an unstructured result | Structuring | Use a reusable knowledge-entry shape with tags, references, and related entries |
 
-Five stages executed in order. Each stage has a defined input, process, and output. For detailed source evaluation criteria, see `references/source-evaluation.md`. For synthesis techniques, see `references/synthesis-patterns.md`.
+### Rationalization Red Flags
 
-### Step 1: Scope Definition
+| Rationalization | Forbidden Move | Corrective Action |
+|-----------------|----------------|-------------------|
+| "The top result already answers it" | Ending collection after one convenient source | Collect enough primary or high-quality sources to triangulate the key claims |
+| "These summaries are useful enough" | Returning stacked per-source notes as synthesis | Extract cross-source patterns, contradictions, gaps, and implications for the target domain |
+| "This source is prestigious, so it can carry the claim" | Treating reputation as a substitute for evidence quality | Score credibility, relevance, and freshness, then require support for important claims |
 
-**Input**: Raw topic, URL, or path from the user.
-**Output**: Research question with boundaries and success criteria.
+## Workflow
 
-- Clarify the research goal: what question are we answering?
-- Identify boundaries: what is in scope vs. out of scope?
-- Determine source strategy: local analysis, web search, or both?
-- Define success: what would a useful knowledge entry contain?
+### 1. Scope Definition
 
-Scoping prevents both rabbit holes (unbounded exploration) and shallow passes (collecting the first 3 results). A well-scoped research question is specific enough to evaluate completeness but broad enough to discover unexpected patterns.
+Input: a raw topic, URL, path, or user question.
+Output: a bounded research question with success criteria.
+Clarify what is in scope, what is out of scope, and whether the job needs local sources, web sources, or both.
 
-### Step 2: Source Collection
+### 2. Source Collection
 
-**Input**: Scoped research question + source strategy.
-**Output**: Raw content from 3-10 sources with provenance metadata.
+Input: scoped question plus source strategy.
+Output: 3 to 10 sources with provenance.
+Collect breadth-first, record origin and access date, and prefer original documentation or source code over commentary when both exist.
 
-- Gather sources systematically: local files (Glob + Read), web pages (WebSearch + WebFetch), or both
-- Record provenance for each source: origin URL/path, date accessed, content type
-- Collect breadth-first: gather all sources before deep-reading any single one
-- Target 3-10 sources: fewer than 3 risks single-source bias; more than 10 risks diminishing returns without synthesis
+### 3. Source Evaluation
 
-**Source selection priority**: Primary sources (original documentation, source code) over secondary sources (blog posts, tutorials) over tertiary sources (aggregators, summaries). When sources of equal tier are available, prefer more recent content.
+Input: collected sources.
+Output: credibility, relevance, and freshness judgments.
+Discard sources that are weak on both credibility and relevance, and flag disagreements between strong sources for later synthesis.
 
-### Step 3: Source Evaluation
+### 4. Synthesis
 
-**Input**: Raw content from collected sources.
-**Output**: Evaluated sources with credibility and relevance scores.
+Input: evaluated sources.
+Output: findings with evidence chains.
+Triangulate key claims, extract recurring patterns, note unresolved gaps, resolve contradictions, and map findings back to the target domain.
 
-- Assess each source on three dimensions: credibility, relevance, freshness
-- Apply the Source Evaluation Framework (see `references/source-evaluation.md`)
-- Discard sources that score low on both credibility and relevance
-- Flag contradictions between high-credibility sources for synthesis attention
+### 5. Knowledge Structuring
 
-Evaluation prevents low-quality sources from polluting the synthesis. A single authoritative source is worth more than five blog posts repeating the same unverified claim.
+Input: synthesized findings.
+Output: a reusable knowledge entry.
+Write the entry so another agent can act on it without reopening the original sources, and connect it to the rest of the knowledge base with tags and related entries.
 
-### Step 4: Synthesis
+## Decision Rules
 
-**Input**: Evaluated sources with credibility ratings.
-**Output**: Synthesized findings with evidence chains.
+### Collection And Evaluation
 
-- Apply synthesis techniques from `references/synthesis-patterns.md`
-- Triangulate: look for claims supported by 2+ independent sources
-- Identify gaps: what questions remain unanswered by collected sources?
-- Resolve contradictions: when sources disagree, determine which evidence is stronger and why
-- Map to target domain: how do findings apply to the ouroboros context?
+| Decision | Rule |
+|----------|------|
+| Source count | Target 3 to 10 sources, because fewer than 3 risks single-source bias and more than 10 usually signals collection avoidance |
+| Source priority | Prefer primary over secondary over tertiary sources, and prefer more recent content when source tiers are otherwise equal |
+| Inclusion threshold | Credibility and relevance determine inclusion, while freshness changes weight rather than acting as a hard gate |
+| Low-quality sources | Discard or down-weight them explicitly instead of blending them into synthesis |
 
-Synthesis is the stage most often skipped or done superficially. The test of good synthesis is whether the output contains insights that no single source contains — if the synthesis could have been produced by reading only the best source, it's a summary, not a synthesis.
+### Synthesis Technique Selection
 
-### Step 5: Knowledge Structuring
-
-**Input**: Synthesized findings.
-**Output**: Structured knowledge entry with frontmatter, findings, and references.
-
-- Structure findings into the knowledge entry format (title, tags, overview, patterns, applications, trade-offs, references)
-- Ensure each finding is actionable: can someone act on it without re-reading the sources?
-- Tag for discoverability: choose tags that connect this entry to existing knowledge
-- Note related entries: identify existing knowledge base entries that overlap or complement
-
-Structuring transforms research from a one-time activity into a reusable asset. A well-structured entry can be found by tag search, understood without context, and applied directly to generation or evolution tasks.
-
-## Source Evaluation Framework
-
-Three dimensions for assessing source quality. See `references/source-evaluation.md` for the detailed rubric.
-
-| Dimension | Question | High | Low |
-|-----------|----------|------|-----|
-| **Credibility** | Is this source trustworthy? | Official docs, peer-reviewed, original author | Anonymous blog, no citations, outdated |
-| **Relevance** | Does it address our question? | Directly answers the research question | Tangentially related, different context |
-| **Freshness** | Is the information current? | Published within relevant timeframe | Outdated for fast-moving topics |
-
-**Composite scoring**: Credibility × Relevance determines whether to include a source. Freshness modulates weight — stale but credible sources are included but down-weighted in synthesis.
-
-## Synthesis Techniques
-
-Four techniques for combining findings across sources. See `references/synthesis-patterns.md` for detailed procedures.
-
-| Technique | Best For | Produces |
+| Technique | Use when | Produces |
 |-----------|----------|----------|
-| **Triangulation** | Validating claims | Confidence ratings based on independent confirmation |
-| **Gap Analysis** | Finding blind spots | List of unanswered questions and missing evidence |
-| **Pattern Extraction** | Identifying recurring themes | Named patterns with evidence citations from multiple sources |
-| **Contradiction Resolution** | Handling disagreements | Resolved position with reasoning for preference |
+| Triangulation | A claim needs confidence | Multi-source support or uncertainty |
+| Pattern extraction | The topic is broad | Named recurring themes with evidence |
+| Gap analysis | Coverage is incomplete | Unanswered questions and missing evidence |
+| Contradiction resolution | Strong sources disagree | A justified preferred interpretation |
 
-**Technique selection**: Start with Pattern Extraction for broad topics, Triangulation for specific claims. Apply Gap Analysis after initial synthesis to identify what's missing. Use Contradiction Resolution when high-credibility sources disagree.
+Validation checks: scope the question before collecting, keep provenance for every source, make each finding actionable without re-reading the source set, preserve explicit evidence gaps, and ensure the final output contains cross-source insight instead of stacked summaries.
 
-## Bias Mitigation
+## Reference Map
 
-Research involves selection and interpretation, creating systematic bias risks:
-
-| Bias | Phase | Symptom | Countermeasure |
-|------|-------|---------|----------------|
-| Confirmation | Collection | Only collecting sources that support initial hypothesis | Search for counterexamples explicitly; include at least one dissenting source |
-| Availability | Collection | Over-relying on easily found sources (top search results) | Look beyond first-page results; check primary sources cited by secondary ones |
-| Authority | Evaluation | Accepting claims because the source is prestigious | Evaluate evidence quality independently of source reputation |
-| Recency | Evaluation | Dismissing older sources as irrelevant | Assess whether the topic is time-sensitive; foundational knowledge ages slowly |
-| Anchoring | Synthesis | First source read dominates the synthesis | Write synthesis from notes, not from memory of reading order |
-
-## Common Pitfalls
-
-| Pitfall | Stage | Prevention |
-|---------|-------|------------|
-| Shallow collection (3 blog posts) | Collection | Use source selection priority; seek primary sources first |
-| Missing synthesis step (list of summaries) | Synthesis | Output must contain cross-source patterns, not per-source summaries |
-| Unstructured output | Structuring | Follow the knowledge entry template; ensure tags and related entries are populated |
-| Single-source dependency | Collection | No single source should contribute >50% of findings; triangulate key claims |
-| Ignoring contradictions | Synthesis | Contradictions between credible sources are findings, not problems to hide |
-| Over-collecting (20+ sources) | Collection | More than 10 sources without synthesis is collection avoidance; stop and synthesize |
-| Domain-blind findings | Synthesis | Every pattern must include an applicability assessment to the target domain |
-
-## Validation Checklist
-
-- [ ] Research question is scoped with clear boundaries and success criteria
-- [ ] 3-10 sources collected with provenance metadata for each
-- [ ] Source evaluation applied: credibility, relevance, and freshness assessed
-- [ ] Low-quality sources discarded or down-weighted with explicit reasoning
-- [ ] Synthesis contains cross-source patterns (not per-source summaries)
-- [ ] Contradictions between sources identified and resolved
-- [ ] Gaps in evidence explicitly noted
-- [ ] Findings mapped to target domain with applicability assessment
-- [ ] Knowledge entry structured with frontmatter, tags, and related entries
-- [ ] Each finding is actionable without re-reading original sources
-- [ ] No single source contributes >50% of the final output
+- `${CLAUDE_SKILL_DIR}/references/source-evaluation.md` — Credibility, relevance, and freshness criteria with scoring guidance.
+- `${CLAUDE_SKILL_DIR}/references/synthesis-patterns.md` — Procedures for triangulation, gap analysis, pattern extraction, and contradiction resolution.
+- `${CLAUDE_SKILL_DIR}/references/deep-research-procedure.md` — Iterative deep-research loop for goal extraction, gap reporting, and convergence checks.
 
 ## See Also
 
-- **researcher agent** (`agents/core/researcher.md`) — Primary consumer; executes source analysis, pattern extraction, and knowledge base cross-referencing
-- **research command** (`commands/core/research.md`) — Orchestrates the full research pipeline: collection → analysis → knowledge entry drafting → worktree management
-- **evolution-methodology** (`skills/core/evolution/SKILL.md`) — Research findings feed into component improvement via the evolution cycle
-- **absorption-methodology** (`skills/core/absorption/SKILL.md`) — Research is the first phase of absorption; findings drive gap analysis and generation
+- `agents/core/researcher.md` — Primary consumer of this methodology.
+- `commands/core/research.md` — Orchestrates collection, analysis, and knowledge-entry drafting.
+- `skills/core/absorption/SKILL.md` — Uses research findings as the first phase of capability mapping and gap analysis.
+- `skills/core/evolution/SKILL.md` — Consumes research findings when diagnosing and improving components.

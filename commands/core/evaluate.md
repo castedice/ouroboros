@@ -1,5 +1,6 @@
 ---
-description: Evaluate plugin component quality — static definition scoring, output quality assessment, or before/after comparison
+name: core:evaluate
+description: "Use when you need to assess a plugin component or module, compare before-and-after changes, or score output against evaluation criteria"
 argument-hint: <file-path|module-name> [--output <output-path>] [--before <path>] [--after <path>] [--single] [--unanimous] [--no-save] [--compare [<baseline>]]
 allowed-tools: Read, Glob, Grep, Task, Bash
 ---
@@ -20,6 +21,35 @@ Target: $ARGUMENTS
 | 5.5 | — (command) | Consensus integration (--multi only) |
 | 6.5 | Bash (tool) | Content hashing + result persistence (--save/--compare) |
 | 7 | — (command) | Baseline loading + regression comparison (--compare) |
+
+## Delegation Contracts
+
+Use the standard runtime contract in `skills/core/collaboration/references/runtime-contract.md`.
+Pass evaluator artifact paths and inline file contents on every call.
+Use named return payloads rather than prose-only summaries.
+The command owns temp files, normalization, consensus state, and saved results.
+The evaluator stays read-only.
+Internal evaluator calls use `Agent(subagent_type: "ouroboros:core:evaluator")`.
+The Bash Codex relay path is additive evidence only.
+
+| Agent | Phases | Input | Expected Output |
+|-------|--------|-------|-----------------|
+| `ouroboros:core:evaluator` | 3, 4, and 5 | `component_path`, mode-specific artifact paths, inline component or output contents, matching criteria reference paths, `depth_level`, prior learnings when present, and temp output path | `level`, `criteria[]`, `improvements[]`, `strengths[]`, `unresolved_questions[]`, and mode-specific fields such as `verdict`, `regressed_criteria[]`, or `output_score` |
+
+## Output Contracts
+
+| Output Mode | Condition | Contract |
+|-------------|-----------|----------|
+| Usage error | Phase 1 parse failure or a required file is missing | Emit a one-line error with the failing precondition and the exact usage string, then abort with no report sections |
+| Mode A static report | Single component, no `--multi` | Ordered sections: `## Evaluation: {path}`, optional `### Structural Validation`, `### Score Summary`, `### Zero-Score Criteria`, and `### Next Actions` |
+| Mode B module summary | Module scan, no `--multi` | Ordered sections: `## Module Evaluation Summary: {module}`, optional `### Structural Validation`, summary table, `### Weakest Component`, and `### Next Actions` |
+| Mode C comparison | `--before` and `--after` provided | Ordered sections: `## Before/After Evaluation: {path}`, `### Score Comparison`, `### Regression Analysis`, `### Verdict`, and `### Next Actions` |
+| Mode D output report | `--output <output-path>` provided | Ordered sections: `## Output Evaluation: {path}`, `### Output Score`, `### Criterion Breakdown`, optional `### Dual-Axis Summary`, and `### Next Actions` |
+| Multi-model augmentation | Any mode with external results | Use `templates/core/multi-model-report.md` as the base wrapper, then append the mode-specific ordered sections above plus `### Agreement` and `### Bias Alerts` |
+| Regression report | `--compare` with baseline present | Use `skills/core/evaluation/references/regression-format.md` Comparison Report Format exactly |
+| Comparison skipped | `--compare` without a baseline | Emit `### Comparison Skipped` with the reason and continue without regression sections |
+| Actionable handoff | Phase 8 Mode A only | Emit either a single `/evolve ...` command block or omit the phase entirely when `saved_result_path` is unavailable |
+
 
 ## Phase 1: Parse Input
 
@@ -48,10 +78,36 @@ Persistence is on by default — results are always saved unless `--no-save` is 
 |------|---------|--------|
 | `--multi` | **auto** | Auto-detect: if codex CLI installed, enable multi-model. Explicit flag forces multi even on first check |
 | `--single` | — | Force single-model evaluation (skip external CLIs) |
-| `--unanimous` | off | Require unanimous agreement across models (only with multi-model) |
+| `--unanimous` | off | Require deliberative consensus on any split criterion or verdict via Advocate, Devil's Advocate, and Judge roles (only with multi-model) |
 | `--sequential` | off | Disable batch parallelism in Mode B (evaluate components one at a time) |
 
 If `--unanimous` without multi-model active: warn "⚠ --unanimous requires multi-model. Ignoring." and continue single-model.
+
+## Branch Summary
+
+| Condition | State | Affected Phases | Behavior |
+|-----------|-------|-----------------|----------|
+| Positional target | missing | 1 abort | Emit the usage error and stop |
+| Parse pattern | single file | 2-8 | Run Mode A static evaluation |
+| Parse pattern | module directory | 2-8 | Run Mode B module scan |
+| Parse pattern | `--before` plus `--after` | 2-8 | Run Mode C comparative evaluation |
+| Parse pattern | `<file> --output <path>` | 2-8 | Run Mode D output evaluation |
+| `--output <path>` | missing in Mode D | 2 abort | Emit the output-path usage error and stop |
+| Structural validation | Mode A or B | 2.5, 6 | Run informational structural validation and prepend the conditional validation section when needed |
+| Structural validation | Mode C or D | 2.5 skipped, 6 | Skip structural validation entirely |
+| `--single` | present | 1, 3, 5.5 | Force Claude-only execution and skip external fan-out |
+| Codex CLI or writable temp dir | unavailable | 1, 3, 5.5 | Fall back to Claude-only execution even without `--single` |
+| `--unanimous` | active with multi-model | 5.5 | Use the unanimous deliberative consensus path |
+| `--unanimous` | active without multi-model | 1, 5.5 | Warn once and ignore the flag |
+| `--sequential` | active in Mode B | 3 | Run module evaluations one at a time instead of batched background execution |
+| External model payload | parse failure | 3, 3.5, 5.5 | Attempt LLM fallback, then exclude the model result from consensus if normalization still fails |
+| `--no-save` | active and `--compare` absent | 6.5 skipped | Skip result persistence |
+| `--save` or `--compare` | active | 6.5 | Persist normalized result payloads via `eval-save.sh` |
+| `--compare <baseline>` | explicit path provided | 7 | Use the named baseline file |
+| `--compare` | no explicit path and baseline found | 7 | Auto-discover the latest baseline and run comparison |
+| `--compare` | baseline missing | 7 | Emit `### Comparison Skipped` and continue without regression sections |
+| Phase 8 handoff | Mode A plus `saved_result_path` available | 8 | Emit the `/evolve ... --eval ...` handoff block |
+| Phase 8 handoff | any other case | 8 skipped | Omit actionable handoff output |
 
 ### CLI Availability Check (auto-detect)
 
@@ -62,7 +118,11 @@ Check `codex` CLI availability and version via Bash. Store: `codex_available` (b
 
 ### Session Temp Directory
 
-Always generate a short session ID (first segment of UUID) and ensure `.tmp/` directory exists. All temp files use the pattern `.tmp/{SESSION_ID}_{purpose}`. Files are cleaned up at the end of the command run (see Rules). Both Claude and Codex evaluation results are persisted here — Claude agents write JSON to `.tmp/{SESSION_ID}_{idx}_claude_eval.json`, Codex results land in `.tmp/{SESSION_ID}_{idx}_codex_eval.json`.
+Always generate a short session ID (first segment of UUID) and ensure `.tmp/` directory exists.
+All temp files use the pattern `.tmp/{SESSION_ID}_{purpose}`.
+Files are cleaned up at the end of the command run (see Rules).
+Both Claude and Codex evaluation results are persisted here — Claude agents write JSON to `.tmp/{SESSION_ID}_{idx}_claude_eval.json`, Codex results land in `.tmp/{SESSION_ID}_{idx}_codex_eval.json`.
+Normalized result files use the sibling pattern `.tmp/{SESSION_ID}_{idx}_{model}_eval.normalized.json`.
 
 Log availability:
 
@@ -80,7 +140,7 @@ If no argument provided:
 
 1. Read target file
 2. Detect component type from frontmatter/filename
-3. Verify type is valid (agent, skill, command, hook, claudemd)
+3. Verify type is valid (agent, skill, command, hook, template, claudemd)
 
 ### Mode B: Module Scan
 
@@ -140,6 +200,7 @@ This phase runs Claude evaluation and external model evaluation. When `--multi` 
 Skip if `--multi` is not active or no external CLIs are available.
 
 Construct the relay prompt using the mode-specific template from `skills/core/evaluation/references/evaluator-relay-prompts.md`. Insert dynamic content (target file, criteria reference) into the template sections. Save assembled prompt to `.tmp/{SESSION_ID}_relay.txt`.
+Before assembling any evaluator relay or Claude evaluator input, call `bash ${CLAUDE_PLUGIN_ROOT}/scripts/learning-load-context.sh "{component-path}"`; if it returns content, include it as a `Prior Learnings` block alongside the component and criteria context so the evaluator can explicitly check whether known issues were addressed, preserved, or regressed.
 
 **Manifest init** (resilient collection): Create a manifest declaring expected results via `scripts/parallel.sh`:
 
@@ -160,7 +221,7 @@ Launch both evaluations simultaneously:
 1. **Background**: Start external model via Bash with `run_in_background: true`:
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/invoke-model.sh codex gpt-5.4 .tmp/{SESSION_ID}_relay.txt .tmp/{SESSION_ID}_codex_eval.json xhigh
+   ${CLAUDE_PLUGIN_ROOT}/scripts/codex-relay.sh .tmp/{SESSION_ID}_relay.txt --output .tmp/{SESSION_ID}_codex_eval.json --effort xhigh
    ```
 
    **Timeout**: 600 seconds. Store the background task ID for later collection.
@@ -168,6 +229,7 @@ Launch both evaluations simultaneously:
 2. **Claude evaluator**: Launch via Agent tool (subagent_type: `ouroboros:core:evaluator`).
    - **Instructions** (all modes): "Evaluate `{component_path}` ({type}). Read the component file and load `skills/core/evaluation/references/{type}-criteria.md`. Apply tiered criteria (F→Q→E) with CoT-first scoring and severity gate. Write result as JSON to `.tmp/{SESSION_ID}_{idx}_claude_eval.json`."
    - Agent always writes JSON to file and returns compact summary only: `"{component_path}: Level {N}, F:{a}/{b} Q:{a}/{b} E:{a}/{b} → {output_path}"`. Main context reads JSON files for Phase 6 reporting and consensus
+   - If agent stdout includes the terminal completion status block from `skills/core/routing/references/completion-status-protocol.md`, ignore or strip it. The JSON file on disk remains the authoritative payload
    - **Mode A/D**: foreground
    - **Mode B**: `run_in_background: true`
 
@@ -175,17 +237,9 @@ For Mode C: run both evaluations for before and after versions (4 evaluations: 2
 
 #### Mode B: File-Based Parallel Execution
 
-Launch all evaluations as background tasks with file-based result collection. This protects the main context window from 10+ component evaluation outputs.
+Per `skills/core/routing/references/parallel-execution-pattern.md`, launch all evaluations as background tasks in batches. Main context handles launch, collection, consensus, and reporting only.
 
-- **Codex**: All relay prompts built upfront → background Bash in waves of 6 → results in `.tmp/{SESSION_ID}_{idx}_codex_eval.json`
-- **Claude**: All evaluator agents launched as background Agent with `run_in_background: true` → results in `.tmp/{SESSION_ID}_{idx}_claude_eval.json`
-- **Main context**: only handles launch, collection, consensus, and reporting
-
-Temp files use component index: `.tmp/{SESSION_ID}_{idx}_relay.txt`, `.tmp/{SESSION_ID}_{idx}_codex_eval.json`, `.tmp/{SESSION_ID}_{idx}_claude_eval.json`. All evaluations are read-only — no shared state between components.
-
-Apply circuit breaker per `skills/core/routing/references/invocation-protocol.md` — 2 consecutive failures per model triggers skip for remainder.
-
-When `--sequential` is set: fall back to one-at-a-time foreground processing. Results are stored and reported in Phase 2 discovery order regardless of completion order.
+When `--sequential` is set: fall back to one-at-a-time foreground processing. Results are reported in Phase 2 discovery order regardless of completion order.
 
 #### When `--multi` is not active (single-model):
 
@@ -222,7 +276,20 @@ Check the background task output. Handle by exit code:
 | 2 | CLI error | Skip model, log error from stderr |
 | 124 | Timeout | Skip model, log: "{model}: timed out after 600s. Skipping." |
 
-**LLM fallback** (exit code 1): Apply the LLM extraction strategy from `skills/core/routing/references/parsing-strategy.md` — read raw output, extract score patterns, construct partial result. Partial scores are valid in consensus; missing criteria are marked `"-"` in the report.
+**LLM fallback** (exit code 1): Apply the LLM extraction strategy from `skills/core/routing/references/parsing-strategy.md` — read raw output, extract score patterns, construct partial result.
+Partial scores are valid in consensus.
+Missing criteria are marked `"-"` in the report.
+
+### Step 3.5: Normalize Evaluation JSON
+
+After each Claude or Codex result is collected, normalize it before any consensus or persistence logic:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/eval-normalize.sh .tmp/{SESSION_ID}_{idx}_claude_eval.json > .tmp/{SESSION_ID}_{idx}_claude_eval.normalized.json
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/eval-normalize.sh .tmp/{SESSION_ID}_{idx}_codex_eval.json > .tmp/{SESSION_ID}_{idx}_codex_eval.normalized.json
+```
+
+Use the normalized files as the authoritative per-model payloads in Phase 5.5 and Phase 6.5. If LLM fallback reconstructs a partial result from raw output, write that JSON first and then pass it through `eval-normalize.sh`. If normalization fails, treat that model result as unparseable and exclude it from consensus.
 
 ### Step 4: Circuit Breaker (Mode B)
 
@@ -257,7 +324,11 @@ Apply consensus integration per `skills/core/routing/references/consensus-protoc
 | A, B, D | Mode B — per-criterion majority/unanimous rule | Standard scoring consensus |
 | C | Mode B applied separately to before/after scores, then verdict consensus | See consensus-protocol.md Before/After Consensus |
 
-With `--unanimous`: apply convergence prompts per consensus-protocol.md Unanimous (Quality Path). Maximum 2 iterations per criterion, then escalate to user.
+With `--unanimous`: apply the single-round deliberative consensus flow from `consensus-protocol.md` Unanimous (Quality Path).
+Use fresh Codex Advocate, Devil's Advocate, and Judge sessions.
+Blind the Judge to model names and raw numeric scores.
+If the Judge agrees with brief A or brief B and no escalation trigger fires, use the mapped score or verdict.
+If any escalation trigger fires, escalate to the user with both briefs.
 
 Calculate and store: `agreement_rate`, `consensus_scores`, `consensus_total`, `bias_flags`, `divergent_criteria`. For Mode C additionally: `verdict_consensus`, `verdict_agreement`, `regression_consensus`.
 
@@ -270,7 +341,7 @@ Record model details in `multi_model.models` as structured objects:
 ]
 ```
 
-Use the actual Claude model ID (e.g., `claude-opus-4-6`) and the Codex model/effort from the invoke-model.sh call above.
+Use the actual Claude model ID (e.g., `claude-opus-4-6`) and the Codex model/effort from the codex-relay.sh call above.
 
 ## Phase 6: Report
 
@@ -296,138 +367,35 @@ When Phase 2.5 ran and produced results, prepend to the mode report:
 
 Omit this section entirely when Phase 2.5 was skipped (Mode C/D) or when validation passed with 0 warnings.
 
-### Single-Model Reports (default, no --multi)
+### Report Assembly Matrix
 
-#### Mode A: Single Static
+Use the matrix below instead of separate prose branches.
 
-Present evaluator's report directly. Highlight:
+| Mode | Single-Model Body | Multi-Model Body | Required Focus |
+|------|-------------------|-----------------|----------------|
+| A | `### Score Summary`, `### Zero-Score Criteria`, and `### Next Actions` | Base wrapper from `templates/core/multi-model-report.md` plus the same three sections | Highlight the weakest criteria and the best next `/evolve` or `/evaluate --output` follow-up |
+| B | `## Module Evaluation Summary: {module}` with component table, module average, weakest component, and `### Next Actions` | The same summary table plus `Agreement Rate` and `Bias Alerts` columns | Keep the output compact and ordered by weakest component first |
+| C | `### Score Comparison`, `### Regression Analysis`, `### Verdict`, and `### Next Actions` | Base wrapper plus `### Verdict Consensus` before `### Regression Analysis` | Surface any 1→0 regression before the overall verdict |
+| D | `### Output Score`, `### Criterion Breakdown`, optional `### Dual-Axis Summary`, and `### Next Actions` | Base wrapper plus the same sections | Compare static promise versus dynamic delivery when a recent static evaluation exists |
 
-- Overall Level and Score
-- Specific improvement directions for 0-score criteria
-- Context-aware next actions:
-  - If Level < 4 with 0-score criteria: "`/evolve {target_path} --focus {lowest_criterion_id}` — improve the weakest area"
-  - If Level = 4: "`/evaluate --output <output-path> {target_path}` — verify output quality matches definition"
-  - Always: "`/evaluate {target_path} --multi` — cross-validate with external model"
-
-#### Mode B: Module Scan
-
-Aggregate all component reports into summary:
-
-```markdown
-## Module Evaluation Summary: {module}
-
-| Component | Type | Level | Score | Key Issue |
-|-----------|------|-------|-------|-----------|
-| {name} | {type} | {1-4} | {n}/5 | {most important improvement} |
-
-**Module Average**: {avg}/5 (Level {avg_level})
-**Weakest Component**: {name} — {reason}
-
-### Next Actions
-- `/evolve {weakest_component_path}` — improve the weakest component
-- `/evaluate {module} --multi --compare` — track improvement over baseline
-```
-
-#### Mode C: Before/After
-
-Present both evaluations + pairwise verdict:
-
-- Side-by-side score comparison
-- Regression warnings (if any criteria dropped)
-- Verdict: improved / degraded / lateral
-- Context-aware next actions:
-  - If improved: "`/evaluate {after_path} --save` — persist the improvement"
-  - If degraded: "Review regressions above. `/evolve {after_path} --focus {regressed_criteria}` — fix regressions"
-  - If lateral: "No change detected. Consider `/evolve {after_path}` with different focus areas"
-
-#### Mode D: Output
-
-Present output evaluation report:
-
-- Score: {n}/5 (C1-C5 flat scoring)
-- Per-criterion breakdown with reasoning
-
-If the component has a recent static evaluation (from `--save` or `dev/evaluations/`), present dual-axis summary:
-
-**Dual-Axis Summary:**
-
-| Axis | Score | Level | Top Issue |
-|------|-------|-------|-----------|
-| Static (definition) | F:{n}/{max} Q:{n}/{max} E:{n}/{max} | Level {1-4} | {top improvement} |
-| Dynamic (output) | {n}/5 | — | {top criterion failure} |
-
-**Gap Analysis**: If static >> dynamic, the definition promises more than it delivers — focus on improving execution. If dynamic >> static, the component works well despite a rough definition — clean up the definition. Suggest: "Improve the lower axis first."
-
-- Context-aware next actions:
-  - If static >> dynamic: "`/evolve {target_path}` — improve execution quality to match the strong definition"
-  - If dynamic >> static: "`/evolve {target_path} --focus F` — clean up the definition to match the good output"
-  - Always: "`/evaluate --output <new-output-path> {target_path}` — re-evaluate after changes"
-
-### Multi-Model Reports (--multi active)
-
-Use the base report structure from `templates/core/multi-model-report.md`. Mode-specific additions:
-
-| Mode | Base Report | Additional Sections |
-|------|-------------|-------------------|
-| A: Single Static | Full base template | — |
-| B: Module Scan | Summary table (same as single-model Mode B) with Agreement Rate and Bias Alerts columns | No base template — compact summary only |
-| C: Before/After | Base + Verdict Consensus table (prepended) + Regression Analysis (appended) | See template Mode C section |
-| D: Output | Base + Dual-Axis Summary (if static evaluation available, same gap analysis as single-model Mode D) | See template Mode D section |
+Prepend the conditional `### Structural Validation` section only for Mode A or Mode B when Phase 2.5 produced warnings or errors.
+Populate wording from the authoritative payloads produced in Phases 3, 5.5, 6.5, and 7 instead of restating mode-specific prose.
 
 ## Phase 6.5: Persist Results (`--save` or `--compare`)
 
 Skip if neither `--save` nor `--compare` is active.
 
-### Step 1: Extract Structured Data
-
-For each evaluated component, extract from the evaluator's markdown report:
-
-- **Level**: Overall level (1-4) from the "Overall Level" line
-- **Scores**: Per-tier scores — F: [achieved, max], Q: [achieved, max], E: [achieved, max]. Skipped tiers are omitted
-- **Criteria**: Per-criterion array — id, name, score (0/1), reasoning
-- **Strengths**: Array of positive observations
-- **Improvements**: Array of { priority, criterion, description }
-
-Claude Code parses the evaluator's markdown output directly — no evaluator agent changes needed.
-
-### Step 2: Collect Hashes
-
-For each component, compute two hashes:
+Pipe the normalized consensus result(s) to `eval-save.sh` and capture stdout as `saved_result_path`:
 
 ```bash
-# Content hash — tracks file changes only
-${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh hash <component-path>
-
-# Eval hash — tracks file + all judge models used
-# Single model:
-${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh eval-hash <component-path> claude-opus-4-6
-# Multi model:
-${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh eval-hash <component-path> claude-opus-4-6 gpt-5.4:xhigh
+saved_result_path="$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/eval-save.sh <module> .tmp/{SESSION_ID}_consensus.json --models claude-opus-4-6 gpt-5.4:xhigh)"
 ```
 
-Store the returned values as `content_hash` and `eval_hash` respectively. Model specs are sorted internally, so argument order does not matter.
-
-### Step 3: Build JSON Result
-
-Construct the result object following the schema in `skills/core/evaluation/references/regression-format.md`:
-
-- `version`: `"1"`
-- `run_id`: Optional. Populated from the saved file path after `regression.sh save` returns (extract NNN from the filename)
-- `timestamp`: Current ISO 8601 with timezone
-- `git_sha`: Short SHA from `git rev-parse --short HEAD`
-- `module`: Module name (for Mode B) or `"single"` (for Mode A)
-- `components`: Array of per-component results
-- `summary`: `{ total, level_distribution: { "1": n, "2": n, "3": n, "4": n } }`
-
-### Step 4: Save
-
-Pipe the JSON to:
-
-```bash
-echo '<json>' | ${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh save <module>
-```
-
-Log: "Results saved to {returned-path}"
+Use `auto` for `<module>` whenever the run should infer the persistence bucket from the component path.
+Pass every normalized consensus file when the run produced more than one persisted artifact.
+Add `--criteria-version <ver>` when the rubric version is explicitly pinned for the run.
+`eval-save.sh` restores canonical criterion names, computes `content_hash` and `eval_hash`, infers the module when needed, saves via `regression.sh save`, triggers `hook-eval-result.sh`, ingests through `learning-ingest-eval.sh`, and prints the saved file path.
+Use `saved_result_path` in Phase 7 comparisons and Phase 8 report handoff.
 
 ## Phase 7: Regression Comparison (`--compare`)
 
@@ -449,6 +417,9 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/regression.sh latest <module>
 ### Step 2: Compare
 
 Load the baseline JSON and current JSON. Compare at 3 levels following the methodology in `skills/core/evaluation/references/regression-format.md`:
+
+Before score comparison, compare `criteria_version` between baseline and current.
+If they differ, warn: "⚠ Baseline used criteria version {old}, current is {new}. Score changes may reflect criteria changes, not component changes."
 
 **Run-level**: Compare total, average level, level distribution.
 
@@ -474,6 +445,20 @@ Highlight:
 - Evaluator variance warnings
 - Structural changes (new/removed components)
 - Overall trend (improving / stable / degrading)
+
+## Phase 8: Actionable Handoff
+
+Apply this phase at the end of Mode A reports only.
+Skip it when `saved_result_path` is unavailable.
+
+- If the component has any 0-score criteria or the overall level is below 4:
+  - Print: `/evolve <component-path> --eval <saved_result_path> --focus <weakest-criterion-id>`
+  - Ask once: "Proceed with evolve?"
+- If the component is Level 4 and the remaining improvements are only [MED] or [LOW]:
+  - Print: `/evolve <component-path> --eval <saved_result_path>`
+
+This is a suggestion only.
+Do not auto-execute `/evolve`.
 
 ## Rules
 

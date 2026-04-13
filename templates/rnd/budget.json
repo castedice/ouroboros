@@ -1,0 +1,103 @@
+{
+  "schema_version": "rnd-budget.v1",
+  "session_id": "",
+  "limits": {
+    "wall_clock_seconds": 5400,
+    "web_search_calls": 15,
+    "web_fetch_calls": 30,
+    "model_route_calls": 2,
+    "probe_calls": 9,
+    "max_parallel": 3,
+    "reserve_probes": 2,
+    "prune_threshold": 4,
+    "max_loops": 2
+  },
+  "usage": {
+    "wall_clock_seconds": 0,
+    "web_search_calls": 0,
+    "web_fetch_calls": 0,
+    "model_route_calls": 0,
+    "probe_calls": 0,
+    "loopbacks": 0
+  },
+  "phases": {
+    "scope": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "prior-work": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "perspectives": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "hypotheses": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "experiment-design": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "probes": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "analyze-prune": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "report": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "review": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    },
+    "meta-learn": {
+      "wall_clock_seconds": 0,
+      "web_search_calls": 0,
+      "web_fetch_calls": 0,
+      "model_route_calls": 0,
+      "probe_calls": 0
+    }
+  },
+  "last_charge": {
+    "type": null,
+    "amount": 0,
+    "stage": null,
+    "at": null
+  },
+  "started_at": "",
+  "updated_at": ""
+}

@@ -72,7 +72,7 @@ _check_state_file() {
 VALID_STAGES="spec_composite spec_dev_gate dev_composite dev_ship_gate ship_composite ship_tune_gate tune_composite"
 VALID_STATUSES="pending running completed invalidated stale"
 VALID_POLICIES="linear probe team team+probe"
-VALID_SPECIALISTS="shaper builder critic bridge"
+VALID_SPECIALISTS="shaper builder critic"
 VALID_SPECIALIST_STATUSES="idle active reviewing"
 VALID_CROSS_REVIEW_STATUSES="pending running completed"
 VALID_PRIMITIVE_STAGES="understand constrain design interface test implement verify optimize"
@@ -94,30 +94,6 @@ _validate_status() {
   done
   echo "Error: Invalid status '$status'. Valid: $VALID_STATUSES" >&2
   exit 1
-}
-
-# ─── Tmux monitor integration ───
-
-_maybe_launch_monitor() {
-  # Skip if not in tmux
-  [[ -z "${TMUX:-}" ]] && return
-
-  # Skip if OUROBOROS_NO_MONITOR is set
-  [[ -n "${OUROBOROS_NO_MONITOR:-}" ]] && return
-
-  # Skip if monitor is already running in another pane
-  local monitor_panes
-  monitor_panes=$(tmux list-panes -t "${TMUX_PANE}" -F '#{pane_pid}' 2>/dev/null | while read -r pid; do
-    ps -o args= -p "$pid" 2>/dev/null | grep -q "spiral-monitor" && echo "$pid"
-  done)
-  [[ -n "$monitor_panes" ]] && return
-
-  local monitor_script="${SCRIPT_DIR}/spiral-monitor.sh"
-  [[ ! -x "$monitor_script" ]] && return
-
-  # Launch in a right-side pane (40% width), targeting the pane where this script runs
-  tmux split-window -h -l '40%' -d -t "${TMUX_PANE}" "cd $(pwd) && $monitor_script"
-  echo "Monitor: launched in tmux pane (OUROBOROS_NO_MONITOR=1 to disable)"
 }
 
 # ─── Action: init ───
@@ -215,9 +191,6 @@ action_init() {
   fi
 
   echo "State initialized: policy=$policy, task=\"$(echo "$task" | head -c 60)...\""
-
-  # Auto-launch monitor in tmux side pane
-  _maybe_launch_monitor
 }
 
 # ─── Action: update ───

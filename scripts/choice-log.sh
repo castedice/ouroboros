@@ -29,8 +29,17 @@ mkdir -p "$(dirname "$LOG_FILE")"
 
 # Extract fields and append entry
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+CWD_FIELD=""
+PROJECT_KEY=""
+
+if command -v jq &>/dev/null; then
+  CWD_FIELD="$(printf '%s' "$STDIN_DATA" | jq -r '.cwd // empty' 2>/dev/null || true)"
+  if [[ -n "$CWD_FIELD" ]] && command -v shasum &>/dev/null; then
+    PROJECT_KEY="$(printf '%s' "$CWD_FIELD" | shasum -a 256 | cut -c1-12)"
+  fi
+fi
 
 # Merge timestamp into the hook data and append
-echo "$STDIN_DATA" | jq -c --arg ts "$TIMESTAMP" '. + { logged_at: $ts }' >>"$LOG_FILE" 2>/dev/null || true
+printf '%s' "$STDIN_DATA" | jq -c --arg ts "$TIMESTAMP" --arg project_key "$PROJECT_KEY" '. + { logged_at: $ts, project_key: $project_key }' >>"$LOG_FILE" 2>/dev/null || true
 
 exit 0

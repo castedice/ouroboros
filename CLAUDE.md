@@ -17,6 +17,16 @@ Ouroboros skills require fully qualified names: `ouroboros:{module}:{command}`. 
 - `Skill: ouroboros:swe:spec` — correct
 - `Skill: evaluate` — fails ("Unknown skill")
 
+### Auto Mode Default
+
+Ouroboros project settings set `permissions.defaultMode` to `auto`.
+
+- Explicit `allow`, `deny`, and `ask` rules still apply first, and auto mode classifies the remaining actions
+- Keep shared rules narrow. Blanket shared allow rules are dropped in auto mode, but ouroboros's scoped patterns still work
+- Do not add an `autoMode` object to shared project settings. Claude Code ignores it there
+- To opt out for one session, use `--permission-mode default` or switch modes in the REPL
+- To opt out personally in this repo, override the setting in `.claude/settings.local.json`
+
 ### Plan Mode Integration (DR-050, DR-064)
 
 Use Claude Code's built-in plan mode (`EnterPlanMode`) actively for non-trivial implementation tasks on ouroboros itself:
@@ -46,6 +56,21 @@ Opus is the default for design, analysis, and synthesis. Route lightweight opera
 | Design decisions, evaluation, synthesis | opus | Direct in main conversation — requires judgment |
 
 When in doubt, keep opus. Rework from low quality costs more than the opus premium.
+
+### Dual-Model Collaboration Defaults
+
+When Claude collaborates with an executor model, Claude remains the controller.
+Claude owns direction, boundaries, verbatim invariants, acceptance criteria, and final review.
+Default delegation level is `auto` unless the command or user fixes another level.
+Pass goals, constraints, boundaries, and verbatim invariants, not suggested implementations.
+Verbatim invariants include user-stated API names, schemas, interfaces, file paths, and explicit preferences.
+After handoff, the executor owns the delegated slice end-to-end.
+Do not steer the executor mid-flight unless the contract itself has become invalid.
+If assumptions change materially, stop, restate the contract, and redelegate rather than nudging the implementation.
+Review is bounded to two rounds of issue-plus-reasoning for unresolved disagreements.
+Summarize what was resolved between models instead of replaying the transcript to the user.
+If the executor is unavailable, use self-critique plus adversarial self-review and escalate sooner on ambiguity.
+`--multi` command behavior is unchanged by these defaults.
 
 ### Tool Selection Guidance
 
@@ -99,6 +124,20 @@ PostToolUse hook (`format.sh`) runs after every Write/Edit. When it produces out
   - Judgment-needed fixes (code block content, structural issues): delegate to sonnet via Task tool
 - Do not ignore hook output — treat warnings as work items until resolved
 
+### CronCreate — In-Session Scheduling
+
+Three scheduling scopes, from ephemeral to persistent:
+
+| Scope | Tool | Lifetime | Use Case |
+|-------|------|----------|----------|
+| Conversational | `/loop` | Current prompt chain | Ad-hoc repetition ("check every 5 min") |
+| Session | `CronCreate` | Until session ends or 7-day expiry | Periodic monitoring, reminders |
+| Persistent | `pa-scheduler.sh` | OS crontab, survives restarts | Unattended automation (morning brief, weekly review) |
+
+CronCreate jobs fire only when the REPL is idle.
+Avoid `:00` and `:30` marks to reduce API contention.
+Do not auto-schedule CronCreate jobs on session start — create them only when the user requests periodic monitoring.
+
 ### Memory Policy
 
 `MEMORY.md` (auto memory) is for **repeated injection only** — things the AI needs every session but that don't belong in Git-managed documents.
@@ -112,7 +151,7 @@ PostToolUse hook (`format.sh`) runs after every Write/Edit. When it produces out
 
 - Project state, progress, next tasks → `dev/STATUS.md`
 - Architecture decisions, design rationale → `dev/DECISIONS.md`
-- Roadmap, phase tracking → `dev/PLAN.md`
+- Milestones, phase tracking → `dev/MILESTONES.md`
 - Lessons learned, backlog items → `dev/STATUS.md` backlog section
 - Session workflow, coding style, commit rules → `AGENTS.md`
 

@@ -1,0 +1,44 @@
+{
+  "schema_version": "rnd-queue.v1",
+  "reserve_probes": 0,
+  "branches": {
+    "br-001": {
+      "branch_id": "br-001",
+      "label": "",
+      "lead_hypothesis": "",
+      "hypothesis_ids": [],
+      "tension_points": [],
+      "status": "proposed",
+      "sub_stage": "hypotheses",
+      "contracts": {
+        "planned": [],
+        "active": [],
+        "completed": []
+      },
+      "scores": {
+        "B1": 0,
+        "B2": 0,
+        "B3": 0,
+        "B4": 0,
+        "composite": 0,
+        "decision": "",
+        "reason": "",
+        "scored_at": ""
+      },
+      "budget": {
+        "allocated_probes": 0,
+        "spent_probes": 0,
+        "reserve_probes_awarded": 0
+      }
+    }
+  },
+  "waves": [
+    {
+      "wave_id": "wave-001",
+      "branch_ids": [
+        "br-001"
+      ],
+      "status": "planned"
+    }
+  ]
+}

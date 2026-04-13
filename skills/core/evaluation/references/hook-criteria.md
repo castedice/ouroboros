@@ -30,7 +30,7 @@ Does the hook behave safely on failure?
 
 Is the hook portable without environment dependencies?
 
-- **1**: Uses `${CLAUDE_PLUGIN_ROOT}` for relative paths. Minimal external dependencies. No OS-specific commands, or conditional branching for different OS
+- **1**: Uses the plugin-root variable for hook script paths. Minimal external dependencies. No OS-specific commands, or conditional branching for different OS
 - **0**: Hardcoded absolute paths, commands that work only on specific OS, assumes uninstalled tools
 
 ### F5: Necessity

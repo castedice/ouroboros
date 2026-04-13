@@ -1,0 +1,71 @@
+{
+  "schema_version": "rnd-session-state.v1",
+  "session_id": "",
+  "question": "",
+  "slug": "",
+  "year": "",
+  "mode": "literature-only",
+  "report_format": "report",
+  "run_status": "active",
+  "current_stage": "scope",
+  "stage_order": [
+    "scope",
+    "prior-work",
+    "perspectives",
+    "hypotheses",
+    "experiment-design",
+    "probes",
+    "analyze-prune",
+    "report",
+    "review",
+    "meta-learn"
+  ],
+  "stages": {
+    "scope": "running",
+    "prior-work": "pending",
+    "perspectives": "pending",
+    "hypotheses": "pending",
+    "experiment-design": "pending",
+    "probes": "pending",
+    "analyze-prune": "pending",
+    "report": "pending",
+    "review": "pending",
+    "meta-learn": "pending"
+  },
+  "branch_search": {
+    "enabled": false,
+    "strategy": "wave",
+    "wave_index": 0,
+    "max_parallel": 3,
+    "active_ids": [],
+    "pruned_ids": [],
+    "merged_ids": []
+  },
+  "loop_count": 0,
+  "archive_dir": "",
+  "session_dir": "",
+  "handoff_dir": "",
+  "artifacts": {
+    "brief": "",
+    "prior_work_map": "",
+    "hypothesis_backlog": "",
+    "experiment_ledger": "",
+    "report": "",
+    "review": "",
+    "meta_learning": ""
+  },
+  "latest_handoff": {
+    "stage_name": "scope",
+    "artifact_paths": [],
+    "unresolved_questions": [],
+    "next_allowed_states": [],
+    "generated_at": "",
+    "budget_snapshot_path": ""
+  },
+  "transitions": [],
+  "stop_reason": null,
+  "started_at": "",
+  "updated_at": "",
+  "stopped_at": null,
+  "completed_at": null
+}

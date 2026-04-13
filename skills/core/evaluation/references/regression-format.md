@@ -9,6 +9,7 @@ Each evaluation run produces a single JSON file capturing the complete snapshot:
 ```json
 {
   "version": "1",
+  "criteria_version": "command-criteria-2026-03-30",
   "run_id": "003",
   "timestamp": "2026-02-20T14:30:00+09:00",
   "git_sha": "5a03e80",
@@ -53,10 +54,11 @@ Each evaluation run produces a single JSON file capturing the complete snapshot:
 | Field | Type | Description |
 |-------|------|-------------|
 | `version` | string | Schema version. Currently `"1"`. Versioning for backward compatibility deferred to production-ready phase |
-| `run_id` | string? | Optional. 3-digit zero-padded monotonic run number (e.g., `"003"`). Assigned by `regression.sh save` to ensure unique filenames. Not present in legacy files |
+| `criteria_version` | string | Recommended. Exact version identifier for the criteria bundle used by this run, such as `command-criteria-2026-03-30`, with an additional stable suffix if multiple bundles are cut on the same date. Include it on every new saved result. Every criteria change must be classified as a `measurement fix` or `policy shift`, and any change requires a full rebaseline before comparison resumes |
+| `run_id` | string? | Optional. 3-digit zero-padded monotonic run number, such as `"003"`. Assigned by `regression.sh save` to ensure unique filenames. Not present in legacy files |
 | `timestamp` | string | ISO 8601 with timezone |
 | `git_sha` | string | Short SHA of HEAD at evaluation time |
-| `module` | string | Module name (e.g., `"core"`) |
+| `module` | string | Module name, such as `"core"`. Infer this from the component path set, not from a hardcoded `"single"` bucket |
 | `components` | array | Per-component evaluation results |
 | `summary` | object | Aggregate statistics |
 
@@ -103,21 +105,11 @@ dev/evaluations/{module}-{NNN}-{YYYY-MM-DD}-{short-sha}.json
 dev/evaluations/{module}-latest.json  → symlink to most recent
 ```
 
-`NNN` is a 3-digit zero-padded monotonic run number per module, assigned by `regression.sh save`. This ensures every evaluation run produces a unique file, even when multiple runs occur on the same day with the same git SHA.
+`NNN` is a 3-digit zero-padded monotonic run number per module, assigned by `regression.sh save`.
+This ensures every evaluation run produces a unique file, even when multiple runs occur on the same day with the same git SHA.
 
-Examples:
-
-- `dev/evaluations/core-001-2026-02-20-5a03e80.json`
-- `dev/evaluations/core-002-2026-02-20-5a03e80.json` (second run, same day/SHA)
-- `dev/evaluations/core-latest.json` → `core-002-2026-02-20-5a03e80.json`
-
-**Legacy compatibility**: Files without a run number (e.g., `core-2026-02-20-5a03e80.json`) remain valid. The counter accounts for both old and new format files when computing the next number.
-
-For single-component evaluations (Mode A with `--save`):
-
-- Same directory, same naming convention
-- The `components` array contains only the single evaluated component
-- `summary.total` is 1
+Use files such as `dev/evaluations/core-001-2026-02-20-5a03e80.json`, `dev/evaluations/core-002-2026-02-20-5a03e80.json`, and the `core-latest.json` symlink, while legacy files without a run number remain valid and single-component saves reuse the same format with a one-item `components` array and `summary.total: 1`.
+Single-component saves should still use the inferred module from the component path so they share the correct baseline history with module scans.
 
 ## Script Actions
 
@@ -136,6 +128,15 @@ For single-component evaluations (Mode A with `--save`):
 
 Regression comparison operates at 3 granularity levels, from coarse to fine:
 
+### Precondition: Criteria Version Match
+
+Before any score comparison, verify that `criteria_version` matches exactly between baseline and current.
+
+When the versions differ, emit a warning such as `⚠ Baseline used criteria version {old}, current is {new}. Score changes may reflect criteria changes, not component changes.`
+If the criteria versions differ, report `criteria drift` and require a full rebaseline instead of a regression comparison.
+
+Score deltas across different criteria versions are not comparable because the rubric changed, even when the change is classified as a `measurement fix`.
+
 ### Level 1: Run-level
 
 Compare aggregate metrics between baseline and current:
@@ -146,7 +147,7 @@ Compare aggregate metrics between baseline and current:
 | Average level | x.x | x.x | ±x.x |
 | Level distribution | {1:a, 2:b, ...} | {1:a, 2:b, ...} | changes |
 
-**New/removed components**: If a component exists in current but not baseline (or vice versa), flag it separately — it is not a regression, it is a structural change.
+**New or removed components**: If a component exists in current but not baseline, or vice versa, flag it separately because it is a structural change, not a regression.
 
 ### Level 2: Component-level
 
@@ -181,7 +182,7 @@ Components without `output_evaluation` are simply skipped in output comparison.
 Drill into criterion-level detail **only when a score drops** (1→0):
 
 - Show the criterion id, name, and reasoning from both runs
-- If `content_hash` is unchanged, the score change is evaluator variance (not a real regression)
+- If `content_hash` is unchanged, the score change is evaluator variance, not a real regression
 - If `content_hash` changed, the score change may be a genuine regression
 
 ## Evaluator Variance Detection
@@ -192,7 +193,19 @@ When `content_hash` is identical between runs but scores differ:
 - **Action**: Note in report but do not count as regression
 - **Threshold**: If >20% of components show variance on the same criterion, flag the criterion as unreliable
 
-This distinction is critical: a score change on unchanged content means the evaluator is inconsistent, not that the component degraded. Tracking variance over time reveals which criteria need tighter specification.
+This distinction is critical because a score change on unchanged content means the evaluator is inconsistent, not that the component degraded.
+Tracking variance over time reveals which criteria need tighter specification.
+
+## Rebaseline Rule
+
+When any static or dynamic evaluation rubric changes, increment `criteria_version`, classify the change as a `measurement fix` or `policy shift`, and create a new full baseline for the affected evaluation scope.
+
+Do not compare pre-change and post-change runs as if they were regressions, even when component content is unchanged or the rubric change is only a `measurement fix`.
+
+**Current version:** `command-criteria-2026-03-30`.
+This is the canonical v2 command criteria bundle and it is classified as a `measurement fix`.
+It finalizes the F3, Q4, Q5, E1, E2, and E3 boundary clarifications and adds criterion-local evidence and rubric-change governance without intentionally changing the severity thresholds or pass bar.
+Existing baselines evaluated under `command-criteria-2026-03-28` or any earlier bundle require rebaseline before comparison.
 
 ## Comparison Report Format
 
@@ -229,7 +242,6 @@ Content: {modified|unchanged}
 {For regressions (score drops), show criterion-level detail:}
 
 **Regressions:**
-
 - {id} ({name}): 1→0 — Baseline: "{reasoning}" → Current: "{reasoning}"
 
 ### Structural Changes
@@ -240,7 +252,6 @@ Content: {modified|unchanged}
 ### Evaluator Variance Summary
 
 {If any variance detected:}
-
 - {n} components with score changes on unchanged content
 - Affected criteria: {list}
 ```

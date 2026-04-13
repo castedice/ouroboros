@@ -94,7 +94,7 @@
 - `README.md` — external: what ouroboros is, installation, quick start
 - `CLAUDE.md` — AI agent: ouroboros development guidelines
 - `dev/VISION.md` — internal: philosophy, ecosystem vision, roadmap
-- `dev/PLAN.md` — internal: concrete implementation tasks and priorities
+- `dev/MILESTONES.md` — internal: version milestones and task tracking
 - `dev/STATUS.md` — internal: current session state
 - `dev/DECISIONS.md` — internal: permanent decision log (this file)
 - `dev/references/` — internal: research materials
@@ -1727,3 +1727,613 @@ Monorepo: `packages/{pkg}/docs/specs/{project,record,knowledge}/` + `packages/{p
 - Use MCP for multi-turn only — unnecessary split when exec resume covers the same use case
 
 **Consequence:** `.mcp.json` deleted. Bridge Agent rewritten from MCP to exec+resume. All MCP references in spiral.md, team-execution-pattern.md updated. 12 ouroboros skills symlinked to `~/.codex/skills/` and verified working (Codex auto-discovers and uses them via description-based matching). Invocation protocol updated to v0.114.0 with exec resume documentation.
+
+## DR-073: PA Module — QMD as Search Infrastructure
+
+**Date:** 2026-03-14
+**Status:** active
+**Context:** PA module needs vault-wide search. Building a custom search engine (BM25 + embeddings + reranking) would take significant effort. QMD (github.com/tobi/qmd) provides exactly this — local, on-device, with MCP server support.
+**Decision:** QMD is a required dependency for PA v1. MCP primary (Claude Code native tool calls), CLI secondary (ops/health). PA does not build search — it builds the intelligence layer on top.
+**Consequence:** PA's data model contains no search indexes. PA maintains semantic overlays only (entities, relations, work items, timeline, dossiers). QMD answers "what is relevant"; PA answers "what to do with it."
+
+## DR-074: PA Module — Vault Structure Agnosticism
+
+**Date:** 2026-03-14
+**Status:** active
+**Context:** Users have diverse vault structures (flat kepano-style, nested PARA, project-centric, journal-first). PA must work with all of them, and also bootstrap fresh empty vaults.
+**Decision:** Agnostic + vault-profile adapter. PA infers vault archetype, folder roles, frontmatter schema, journal style, and link density. Profile is presented for user confirmation. Two entry paths: `/pa init` (fresh) and `/pa survey` (existing).
+**Consequence:** vault-profile.json schema designed with archetype detection, placement rules, naming rules, journal style, linking style, writing style, and assistant preferences.
+
+## DR-075: PA Module — Automation Posture System
+
+**Date:** 2026-03-14
+**Status:** active
+**Context:** Trust is PA's product. Users range from "never touch my vault" (kepano philosophy) to "actively manage it for me." A single permission model doesn't fit.
+**Decision:** 4-level automation posture: observe → propose → apply-low-risk → operate. Fresh vaults default to apply-low-risk, existing vaults default to propose. Delete/rename/move always requires confirmation.
+**Consequence:** Every PA action logged in assistant-ledger.jsonl with posture. Posture governs all write operations. User can change posture at any time.
+
+## DR-076: PA Module — Multi-Model Design Process
+
+**Date:** 2026-03-14
+**Status:** active
+**Context:** Single-model design risks anchoring bias. The user requested diverse perspectives on PA architecture.
+**Decision:** 5-turn iterative Codex design process with gradual context reveal: Turn 1 (goal only) → Turn 2 (+QMD) → Turn 3 (+kepano) → Turn 4 (consolidated) → Turn 5 (+obsidian-cli). Then merge Claude and Codex designs.
+**Consequence:** Both models independently arrived at 14-15 commands, MCP-first QMD integration, and methodology-aware-not-imposing principle. Key Codex contributions adopted: chief-of-staff framing, trust/posture system, assistant-ledger, typed relations, dossiers, vault-profile schema, 3-plane architecture, operator agent. Full spec in dev/PA-DESIGN.md.
+
+## DR-077: PA Module — Three-Plane Architecture (Obsidian CLI)
+
+**Date:** 2026-03-14
+**Status:** active
+**Context:** Obsidian official CLI (v1.12.4+, Feb 2026) provides vault-native operations that raw filesystem access cannot: move with auto link update, template-based creation, validated property writes, graph/backlink data, task management, daily note operations.
+**Decision:** PA adopts a 3-plane architecture: QMD (retrieve) + Obsidian CLI (mutate safely) + Filesystem (state + fallback). Obsidian CLI is recommended but not required — PA degrades gracefully across 3 capability tiers (full, standard, fallback). New `operator` agent handles vault-native mutations. Critical rule: never bypass `obsidian move` with raw file move.
+**Consequence:** Agent count 7 → 8 (operator added). Scribe/operator separation: scribe decides what, operator decides how. Tool routing table defines primary/fallback for every operation type. `obsidian eval` restricted to read-only audited snippets.
+
+## DR-078: PA Module — Filesystem-First I/O
+
+**Date:** 2026-03-15
+**Status:** active (supersedes DR-077 Three-Plane Architecture)
+**Context:** Obsidian CLI requires the app to be running with the vault open, and the `vault=` parameter only works when the target vault is active. This creates an unwieldy dependency for an AI-managed vault. The user prefers direct filesystem read/write with `ob sync` for cloud synchronization.
+**Decision:** Filesystem is the primary read/write channel. Obsidian CLI is optional runtime enhancement (backlinks, graph stats, plugin introspection). `ob` handles sync headlessly. Capability tiers updated: full (fs+QMD+ob), standard (fs+QMD), fallback (fs only), enhanced (full+Obsidian CLI).
+**Consequence:** PA-DESIGN.md architecture diagram updated. Tool routing table revised — filesystem is primary for all CRUD operations. Obsidian CLI recommended only for `move` (link auto-update) when available.
+
+## DR-079: PA Module — Evolutionary Vault Structure (A+E Model)
+
+**Date:** 2026-03-15
+**Status:** active
+**Context:** Initial `/pa init` presented 4 starter profiles (kepano-flat, nested-project, para-like, journal-first). The user felt the resulting structure had inconsistent depth — some areas nested, others flat. Research (Codex) identified 5 alternative approaches. Discussion converged on starting minimal and evolving.
+**Decision:** Start with A+E (Flat + Memory Stage), evolve to B+C+D+E as the vault grows. Folders by note kind/lifecycle, not by domain. Domain classification via frontmatter. D-lite (aliases, relates_to) from day 0. Folder splits require 3 conditions: threshold crossed + observable friction + human browsing benefit. AI proposes splits, user approves.
+
+| Phase | Model | Trigger |
+|-------|-------|---------|
+| 0 | A+E: inbox/, notes/, journal/daily/, assets/, archive/ | Start |
+| 1 | +C: journal/ cadence folders (lazy creation) | First weekly/monthly use |
+| 2 | +D: entities/, maps/ separation | Entity > 40-50 or map > 8 |
+| 3 | +B: projects/, type-based subfolders | Active projects ≥ 5 or durable notes > 150 |
+
+**Frontmatter replaces folders for classification:**
+- `type`: concept | entity | source | decision | project | map
+- `memory_stage`: sensory | working | long-term
+- `status`: active | dormant | archived
+- `domains`, `projects`, `areas`: plural arrays with note links
+
+**Alternatives rejected:**
+- Full B from start — over-scaffolded for an empty vault
+- Pure flat (A only) — no operational boundaries for write routing
+- E alone — folder movement too complex without automation
+
+**Consequence:** Phase 0 structure: 6 top-level folders + .pa/. Weekly/monthly/quarterly/annual journal folders created lazily on first use. Evolution triggers documented in vault-profile.md.
+
+## DR-080: PA Module — AI-Autonomous State Management
+
+**Date:** 2026-03-15
+**Status:** active
+**Context:** User stated ".pa/ 안은 내가 관여하지 않을 거야. 너가 관리하게 될 거고 의사결정을 너가 해야 해." Also noted multiple agents may run concurrently.
+**Decision:** `.pa/` state files are fully AI-managed. PA makes autonomous decisions about state without user confirmation for routine operations. Survey/init open questions answered by AI based on context, not forwarded to user. Concurrent agent access must be considered (lock files or atomic writes for future phases).
+**Consequence:** Survey dogfooding: AI answered all 5 cartographer open questions autonomously. User confirmation reserved for profile changes that affect vault structure or posture, not for internal state management.
+
+## DR-081: PA Phase 3 — Shared Write Contract + Codex Co-Design
+
+**Date:** 2026-03-16
+**Status:** active
+**Context:** Phase 3 (Write Core) required Codex and Claude to independently design the architecture, then merge. Key Codex contributions: shared write contract (write_request → write_plan → mutation_report → ledger_entry), permission envelope pattern (command generates, agent honors), precedent ladder for voice adaptation (5-level priority), 3-axis capture triage taxonomy, single-output bias for capture.
+**Decision:** Adopt the Codex+Claude co-design workflow: Codex generates an independent plan first (without reading files), Claude generates independently, then merge the best of both. Codex contributions became the architectural backbone of Phase 3 (write contract, permission envelope, precedent ladder). Claude contributed methodology details (writing SKILL, scribe agent).
+**Consequence:** Phase 3 design quality exceeded what either model would produce alone. Established the co-design pattern for future phases. Phase 4 also used this pattern (Codex generated 6/8 components, Claude generated 2/8).
+
+## DR-082: PA — Assistant Ledger as Audit Trail
+
+**Date:** 2026-03-16
+**Status:** active
+**Context:** Phase 3 write commands need an audit trail for trust. PA-DESIGN.md specified `assistant-ledger.jsonl` but no schema existed.
+**Decision:** Append-only JSONL at `{vault}/.pa/assistant-ledger.jsonl`. 4-point logging (proposal, posture block, mutation, failure). Command is the sole writer (single-writer pattern, post-agent-return). Schema: ts, run_id, command, agent, action, status, posture, risk_class, target_paths, confidence, why, reversible, reversal_hint. User feedback as follow-up entries linked by run_id.
+**Consequence:** Schema documented in `skills/pa/trust-and-boundaries/references/ledger-schema.md`. Draft and capture commands reference it. Engram vault ledger initialized during dogfooding.
+
+## DR-083: PA Phase 4 — Work/Timeline Extraction via Survey
+
+**Date:** 2026-03-16
+**Status:** active
+**Context:** Phase 4 (Temporal Overlay) needs work.jsonl and timeline.jsonl populated from vault content. Two options: lazy extraction on first agenda run, or survey refresh as the extraction point.
+**Decision:** Survey refresh is the extraction point. survey.md Phase 7 will extract work items (checkboxes, deadlines, waiting-fors) and timeline events (dated notes, milestones, recurring anchors) into `.pa/work.jsonl` and `.pa/timeline.jsonl`. Agenda/day commands read these files but do not extract.
+**Consequence:** Clear separation: survey owns extraction, temporal commands own judgment. Survey.md Phase 7 update pending implementation.
+
+## DR-084: PA — Progressive Depth Router
+
+**Date:** 2026-03-16
+**Status:** active
+**Context:** PA commands가 agent 스폰 + QMD 쿼리 + synthesis로 인해 단순 질문에도 20-30초 소요. 사용자가 자연어로 `/pa`에 말할 때 대부분은 간단한 질문이나 메모인데, 매번 full agent pipeline을 타는 것은 과도함.
+**Decision:** `/pa` 라우터에 progressive depth 도입. Phase 3.5에서 complexity를 `simple`/`complex`로 분류. Simple은 fast path (inline QMD query, agent 스폰 없음, ~5초). Complex이거나 사용자가 "더 자세히"를 요청하면 deep path (full agent pipeline, ~25초). Draft, revise, day는 항상 deep path.
+**Consequence:** 체감 응답 속도 4-5배 개선 (25초 → 5초). 사용자가 필요할 때만 depth 요청. Router가 QMD tools를 직접 사용 (Grep/Glob은 .pa/ 설정 읽기용, vault 검색은 QMD 전담).
+
+## DR-085: PA Phase 5 — Semantic Overlay Architecture
+
+**Date:** 2026-03-17
+**Status:** active
+**Context:** Phase 1-4 완료 후 PA에 관계 인식 능력이 없었음. Vault 노트 간 연결을 발견하고, entity identity를 추적하고, 목표 중심 working context를 구성하는 기능이 필요. Claude + Codex가 독립적으로 설계한 계획을 합산하여 구현.
+**Decision:** (1) link = primitive, focus = composite. link는 단일 노트/entity 중심 발견, focus는 목표 중심 종합. (2) weaver = graph reasoner (sonnet), librarian = retrieval broker — 역할 분리. (3) Deterministic-first extraction: wikilinks, frontmatter, note titles 우선. Semantic은 보조. Relation 등록 시 structural signal 필수 — semantic neighbor만으로 relation 생성 금지. (4) link default read-only — apply는 사용자 명시 요청 + posture check. (5) Dossier는 `.pa/dossiers/` (assistant state) — user vault에 직접 쓰지 않음. (6) Dirty-path refresh: draft/capture 후 derivation-state.json에 수정 경로 기록, 다음 link/focus에서 incremental refresh. (7) Router fast path = narrow link suggestions only (weaver 없이 1-2개), focus는 항상 deep path. (8) `create_unresolved_breadcrumbs=false` 존중 — 존재하지 않는 노트로의 새 wikilink 금지. (9) `link_density` 기반 제안 수 조절 (low=1-2, medium=3-5, high=무제한).
+**Consequence:** 10개 신규 파일 + 4개 수정. Evaluable 6/8 컴포넌트 Level 4. Templates 2개는 전용 criteria 부재로 정확 평가 불가 (기능적으로 기존 PA templates와 동일 패턴). Engram vault dogfooding에서 MOC의 8개 unresolved wikilink 발견 + 1개 신규 연결 제안 성공.
+
+## DR-086: PA Phase 6 — Ingestion + Compilation Architecture
+
+**Date:** 2026-03-17
+**Status:** active
+**Context:** Phase 1-5 완료 후 vault에 외부 콘텐츠 유입 경로와 축적된 캡처 요약 승격 경로가 없었음. Vault가 수동 입력에만 의존하고 timestamp notes가 무한 축적되는 문제. Claude + Codex가 독립적으로 설계한 계획을 합산.
+**Decision:** (1) 신규 agent 없음 — curator (ingest triage) + scribe (compile voice) + librarian (QMD) 재사용. (2) 기존 skill 확장, 신규 skill 없음 — capture-distillation에 source-digest/ingest-digest/existing-note-proposal 라우팅 추가, executive-assistance에 compilation-policy reference 추가. (3) compile = period-bounded only — evergreen 승격은 `/pa draft`에 위임. (4) source-packet normalization — ingest의 모든 입력(URL, paste, transcript, file)을 하나의 형태로 정규화. (5) day.md evening handoff 구조화 — compile candidates를 structured block으로. (6) Dedupe = QMD lex + content hash 이중 확인. (7) Router always deep path — ingest, compile 모두 complex 분류. (8) WebFetch graceful degradation — URL 실패 시 stub note. (9) Compile cursor in derivation-state.json으로 재컴파일 방지.
+**Consequence:** 5개 신규 + 6개 수정. Evaluable 3/5 Level 4. compilation-policy는 Codex 개선으로 L1→L4. Templates는 Phase 5와 동일한 skill criteria 구조적 한계. Dogfooding에서 paste ingest 파이프라인 (router→curator→dedupe→write) 정상 동작 확인.
+
+## DR-087: PA Phase 7 — Review Loops + Life Horizons Architecture
+
+**Date:** 2026-03-17
+**Status:** active
+**Context:** Phase 1-6 완료 후 축적된 커밋먼트와 노트의 건강 상태를 주기적으로 점검하는 메커니즘이 없었음. work.jsonl의 open items, waiting-fors, orphan notes가 무한 축적. 또한 주간을 넘어 생애 전체까지의 review horizon이 필요하다는 사용자 비전. Claude + Codex 합산 설계.
+**Decision:** (1) sentinel = read-only watchdog (sonnet) — stale/orphan/unresolved/forgotten 감지만. (2) review = primitive with `--horizon` (week|month|quarter|year|3y|10y|30y|lifetime), reset = composite (review→compile→agenda→link). `weekly` 대신 `reset --horizon week` 패턴으로 모든 horizon 통합. (3) 짧은 horizons = 데이터 기반, 긴 horizons = 대화 기반 방향 점검. (4) review-and-journaling skill + 3 references (review-state-schema, resurfacing-rules, fractal-journaling). (5) Resurfacing = 14일+ staleness + QMD similarity ≥ 0.4, anti-nag 30일 suppression. (6) Dual windows (Codex): retrospective + forward. (7) Profile-aware review (Codex): vault-profile 기반 orphan/unresolved 필터링. (8) Compile preflight in reset. (9) template-criteria.md (v1.0.2) 사용으로 template 평가 정상화.
+**Consequence:** 9개 신규 + 3개 수정. Codex exec로 생성 + Codex 개선. 9/9 evaluable 컴포넌트 Level 4. template-criteria 첫 적용으로 follow-up-report, weekly-review 모두 L4. Dogfooding에서 router→review 정확 분류, sentinel이 MOC 경로 불일치 + orphan notes 정확 탐지.
+
+## DR-088: PA Phase 8 — Stewardship Meta-Composite
+
+**Date:** 2026-03-17
+**Status:** active
+**Context:** Phase 1-7 완료 후 개별 commands는 모두 구현됐지만, vault 유지보수를 한번에 수행하는 최상위 명령이 없었음. PA module 완성을 위한 마지막 Phase. Claude + Codex 합산 설계.
+**Decision:** (1) steward = survey(incremental) + review(month) + link(targeted) + agenda(week) — reset과 구분: reset=compile 포함 주기 리셋, steward=survey 포함 유지보수. (2) operator agent 미구현 — steward는 subcommand에 위임. (3) 신규 agent/skill/template 없음 — 기존 컴포넌트 조합만. (4) Proposal-first — user-visible markdown은 proposal, .pa/ state는 auto-refresh. (5) 각 subphase skip condition — survey(QMD 최신), review(24h 이내), link(dirty_paths 없음), agenda(work.jsonl 비어있음). (6) Codex exec로 생성 + Codex 개선 (E2 dedup, Q1 delegation contracts, F5 allowed-tools trim).
+**Consequence:** 1개 신규 command + 2개 수정. L4 (16/16). PA module Phase 1-8 전체 완성. 16 commands, 8 agents (operator 미구현), 8 skills, 14 templates.
+
+## DR-089: PA Phase 11 — People Graph + 2-Layer Privacy
+
+**Date:** 2026-03-18
+**Status:** active
+**Context:** Phase 10 life ontology에 person entity kind이 이미 존재하지만 상세 프로파일, 관계 추적, 프라이버시 보호가 없음. 사용자가 vault에 쓰는 실명이 Claude 컨텍스트에 노출되는 것을 방지해야 함.
+**Decision:** (1) 2-layer privacy — shell(entities.json, masked) + detail(.pa/people/profiles/, local-only). (2) mask-map.json으로 real_name ↔ mask_id 순차 매핑(Person_A, B, ...). (3) pa-mask.sh CLI — mask/unmask/add/list, Perl UTF-8 word-boundary 매칭. (4) 5 person-specific relation types — colleague-of, family-of, friend-of, mentored-by, reports-to. (5) propose-only vault rename — 사용자 wikilink 자동 변경 금지. (6) MVP 암호화 없이 마스킹 + 파일 접근 제어만.
+**Consequence:** 3 new files (people-schema.md, masking-rules.md, pa-mask.sh) + 8 updated files. 평가 후 quantified rules, bias mitigation, worked examples 보강 완료.
+
+## DR-090: PA Phase 11b — Ontology-Driven Privacy Architecture
+
+**Date:** 2026-03-18 (v3: ontology 통합 + 상세 설계)
+**Status:** active
+**Context:** Phase 11 MVP의 Person_A 마스킹 패턴을 모든 entity kind로 확장. 핵심 발견: (1) 이름 + 민감 맥락 조합이 식별 가능 개인정보를 만듦, (2) ontology entity extraction이 곧 privacy registration — 별도 PII registry 불필요, (3) AI가 entity 추출 시 safe_name을 부여하기에 가장 적합 (1회 노출 후 이후 미노출).
+**Decision:** Codex + Claude brainstorm v1(인프라) + v2(기업 규제) + 상세 설계:
+(1) **Entity = Privacy Node** — 모든 entity에 `mask_id`(고유 식별, ORG_A) + `safe_name`(일반화 범주, "대기업 기술팀") 부여. Phase 11의 person 전용 mask-map을 범용 ontology privacy layer로 확장.
+(2) **Progressive Learning** — 최초 survey 시 1회 원문 노출 → Weaver가 entity 추출 + mask_id/safe_name 동시 부여 → shadow vault 생성 → 이후 세션에서 원문 미노출. 새 고유명사도 같은 흐름.
+(3) **5-Layer Protection** (shadow vault / QMD proxy 적용 순서): HTML 주석 strip → private:true stub → PII regex → entity mask_id(safe_name) 치환 → 숫자 일반화(금액→범위, 날짜→월, 나이→연대).
+(4) **이름은 standard 통과, inner-circle만 mask_id** — 이름만으로는 식별 불가.
+(5) **Private = HTML 주석** — `<!-- -->`가 곧 private. 새 문법 불필요.
+(6) **Governance**: transmission audit ledger, consent_status, pa-mask.sh forget(cascade).
+(7) **인프라**: vault Read deny + shadow vault + QMD MCP proxy. 검증 완료.
+**Consequence:** "별도 PII registry"에서 "ontology = registry"로 통합. entity extraction = privacy registration 동시 수행. mask-map.json은 ontology의 특수 뷰로 재정의 가능. Phase 11b checklist 11항목.
+
+## DR-091: Name Hash Reverse Index — 실명 없이 동명이인 해소
+
+**Date:** 2026-03-18
+**Status:** active
+**Context:** 동명이인 구분에 맥락이 필요한데 AI가 실명을 보면 프라이버시 모순. 사용자가 "김철수(회사)" 같은 구분자를 쓰는 것은 불편.
+**Decision:** (1) `name_hash` 배열 — 풀네임, 이름만(성 생략), alias 각각의 SHA-256 앞 8자를 entity shell에 포함. (2) `.pa/hash-index.json` 역인덱스 — hash → [mask_id, ...] 매핑. (3) 해소 흐름: hash 조회 → 1개면 확정, 2+개면 area_refs + 노트 경로로 해소, 0개면 미등록 제안. (4) PA는 실명을 모르지만 "Person_A와 Person_B가 같은 이름"인 건 hash 일치로 인지. (5) pa-mask.sh가 로컬에서 실명으로 마스킹, PA는 hash로만 추론 — 2트랙 구조.
+**Consequence:** 사용자 구분자 불필요. 성 생략("철수"), alias("MJ") 모두 hash로 커버. mask-map.json에 name_hashes 필드 추가.
+
+## DR-092: PII Masking Tiers + Private Tag
+
+**Date:** 2026-03-18
+**Status:** active
+**Context:** 이름 외에도 전화번호, 이메일, 주소 등 개인정보가 자연어에 섞여 있음. "우리 팀장" 같은 역할 표현은 PII가 아니라 raw 데이터(번호, 주소 등)가 문제.
+**Decision:**
+(1) **Tier 1 — Regex PII**: 전화번호(`010-\d{4}-\d{4}`), 이메일, 주민번호(`\d{6}-\d{7}`), 계좌번호 패턴 → `[PHONE_1]`, `[EMAIL_1]` 등 카테고리별 토큰 치환. pa-mask.sh `--pii` 모드.
+(2) **Tier 2 — Registered PII**: mask-map.json을 범용 PII registry로 확장. `kind` 필드: `name`, `org`, `address`, `phone`, `email`, `custom`. hash index도 kind별 지원.
+(3) **Private Tag — 3단계 granularity**:
+- 블록: `<!-- private -->...<!-- /private -->` — 여러 줄 감싸기
+- 인라인: Tier 1 regex가 커버하므로 별도 인라인 태그 불필요. 정말 필요하면 `<!-- p: 내용 -->`
+- 노트 전체: frontmatter `private: true`
+(4) **Redaction 방식**: `[PRIVATE BLOCK]`으로 치환 (silent 삭제 아님). Claude에게 "여기에 내용이 있었지만 비공개"를 알림. `private: true` 노트는 shadow vault에서 stub 생성: `# [PRIVATE NOTE]\n\n이 노트는 비공개입니다.`
+(5) **QMD 동작**: QMD는 로컬이므로 원문 인덱싱 정상 수행. MCP proxy가 결과 전달 시에만 name masking + PII masking + private block stripping 적용. `private: true` 노트의 QMD 결과는 제목 + `[PRIVATE NOTE]`만 반환.
+(6) **Weaver 동작**: private-tagged 블록에서 entity 추출 안 함. `private: true` 노트에서 entity 추출 안 함. 단, private 노트로의 wikilink 관계는 유지 (entity는 존재, content만 미추출).
+(7) **중첩 불허**: `<!-- private -->` 블록 중첩 금지. 단일 레벨만. frontmatter `private: true`와 블록 태그 동시 사용 시 frontmatter가 우선 (노트 전체 비공개).
+(8) **Obsidian 호환**: HTML 주석이라 읽기 뷰에서 안 보임. Obsidian 자체 주석 `%%`와 역할 분리 — `%%`는 사용자 메모, `<!-- private -->`는 PA 프라이버시 마커.
+**Consequence:** Tier 1-2 PII + private tag가 Phase 11b 범위에 포함. pa-mask.sh에 `--pii` + `--strip-private` 모드 추가. shadow vault sync와 QMD proxy에서 3중 마스킹 적용 (name + PII + private).
+
+## DR-093: PA Phase 12 — Persona + Response Contract
+
+**Date:** 2026-03-19
+**Status:** active
+**Context:** PA의 모든 user-facing 출력이 하드코딩된 톤으로 생성됨. personal-profile.json에 communication_style 필드가 있지만 어떤 command/agent도 이를 읽어서 출력에 반영하지 않음. 사용자마다 선호하는 말투(해요체/합니다체/반말)와 톤(부드럽게/직설적으로)이 다름.
+**Decision:**
+(1) **Persona ≠ Profile** — `.pa/persona.json`(PA의 말투)과 `.pa/personal-profile.json`(사용자 정체성)을 분리. Persona는 presentation layer, profile은 substance.
+(2) **2-Layer Render Contract** — Reasoning layer(facts, rankings, evidence, confidence, actions)는 persona가 절대 변경 불가. Render layer(sentence endings, hedging, warmth, emoji, address)만 persona가 제어. 8개 invariant conditions로 경계 강제.
+(3) **최소 침습 패턴** — 각 command의 Load State에 persona.json 읽기 1줄, Present phase에 render contract 적용 단락 1개 추가. Command-specific 커스터마이징 없음.
+(4) **Agent 경계** — chief-of-staff, sentinel 등 agent는 persona 미적용. 구조화된 데이터를 반환하고, calling command가 render 시 persona 적용.
+(5) **Scribe 제외** — Scribe는 vault의 기존 노트 스타일을 따름 (precedent ladder). Persona는 PA가 사용자에게 말하는 톤. 완전히 다른 레이어.
+(6) **기본값** — professional-friendly, haeyo(해요체), medium warmth, medium-high directness, emoji off, address omit. Missing persona.json은 기본값 fallback, 절대 abort하지 않음.
+(7) **인터뷰** — init Phase 3d에서 2-3문 (말투/응답 스타일/이모지). 선택적. 스킵 시 기본값.
+**Consequence:** 3 new skill files + 10 modified files. 모든 user-facing command가 persona-aware. Evaluation L4 (3/3). Dogfooding으로 haeyo rendering + invariant 보존 검증 완료.
+
+## DR-094: PA Phase 13 — Interview-Based Specialist Generation
+
+**Date:** 2026-03-19
+**Status:** active
+**Context:** PA에 도메인 전문 조언 기능이 없음. 초기 설계는 3개 hardcoded specialist (health, finance, learning)였으나, (1) 보편적이지 않음 — 사용자마다 core_areas가 다름, (2) 같은 area라도 관점이 다름 — 안정적 재무 vs 공격적 재무, 파워리프팅 vs 가벼운 운동.
+**Decision:**
+(1) **Interview-based generation** — hardcoded default 대신 persona interview (관점/스타일/우선순위 3문)를 통해 사용자 맞춤 specialist 생성. 같은 area라도 다른 관점의 전문가가 나옴.
+(2) **Command가 specialist 호출, chief-of-staff가 merge** — chief-of-staff의 tool 변경 없이 command가 registry 기반으로 active specialist를 병렬 호출. specialist_advice[]를 chief-of-staff input에 전달. chief-of-staff가 Specialist Insights 섹션으로 통합.
+(3) **Registry auto-filter** — specialists.json의 `surfaces` + `status` 필드로 어떤 command에서 어떤 specialist가 호출될지 자동 결정. area_refs exact match로 work item 필터링.
+(4) **Exemplar pattern** — 기존 3개 agent (health, finance, learning)는 삭제하지 않고 생성 시 구조 참고용 exemplar로 유지.
+(5) **`/pa specialist` command** — `create <area>` (인터뷰 + 생성), `list`, `remove <id>`. init/survey에서도 같은 생성 워크플로우 사용.
+(6) **Phase 14 준비** — `trigger_conditions`, `capabilities`, `status: "suggested"` 필드로 자동 활성화 기반 마련. 단, Phase 13 MVP에서는 수동 생성만.
+**Consequence:** 5 new files (SKILL, registry ref, specialist command, 3 exemplar agents) + 7 modified files. SKILL.md L4 (16/16). 사용자의 실제 life areas에 맞춤형 전문가 생성 가능.
+
+## DR-095: PA Phase 14 — Dynamic Activation + Life OS Loops
+
+**Date:** 2026-03-20
+**Status:** active
+**Context:** Phase 13의 specialist runtime은 수동 생성/활성화만 가능. Area coverage signal 기반 자동 제안, review specialist 통합, deactivation lifecycle이 없음.
+**Decision:**
+(1) **Dual-anchor coverage signal** — specialist 제안에 profile anchor (core_areas) + activity anchor (ontology: goal/habit entity OR operational: 3+ work items) 이중 조건 요구. Profile anchor 없이는 제안하지 않음 — 사용자가 area를 선언하지 않으면 operational signal만으로 제안하지 않는다.
+(2) **Suggested → active lifecycle** — survey에서 coverage signal 계산 → `status: "suggested"` stub 생성 → 사용자 interaction: create now (persona interview) / keep suggested / decline (30일 재제안 억제). Day/agenda에서는 non-blocking 알림만 (Phase 3.4), registry-level 변경은 survey만.
+(3) **Deactivation 2-tier** — `source: "auto"` specialist만 hard deactivation (coverage drop 시 자동 inactive). `source: "generated"/"manual"/"default"`는 soft proposal only (survey/review에서 "일시 중지할까요?" 제안). 사용자 등록 specialist는 절대 자동 비활성화하지 않음.
+(4) **Review capability-based filtering** — review Phase 3.5에서 specialist `capabilities` 필드와 horizon을 매칭: week(assess_today, habit_check), month(+carry_forward), quarter+(risk_scan, carry_forward). Irrelevant capability의 specialist는 건너뜀.
+(5) **auto_state tracking** — `last_evaluated`, `last_declined_at`, `last_matched_at` 3개 필드로 activation lifecycle 추적. Day/agenda/review에서 `last_matched_at` 업데이트. 90일 무매칭 시 soft deactivation 제안.
+(6) **Enrichment loop 제외** — specialist-insights.jsonl + survey catch-up profile feedback은 복잡도 높아 Phase 15로 연기. Phase 14 MVP는 specialist advice가 review에 포함되는 것까지.
+(7) **Phase 3.4 non-blocking** — day/agenda의 suggested specialist 알림은 briefing 흐름을 끊지 않음. Phase 5에서 렌더링하고, 사용자가 보고 나서 응답.
+**Consequence:** 1 new file (activation-signals ref) + 8 modified files. L4 3/3 consensus. Profile → ontology → specialist → day/agenda/review 루프 완성. Enrichment feedback은 Phase 15.
+
+## DR-096: PA Phase 15 — Enrichment Loop (Specialist → Profile Feedback)
+
+**Date:** 2026-03-20
+**Status:** active
+**Context:** Phase 14에서 specialist advice가 day/agenda/review에 포함되지만 ephemeral — 기록이 없어 패턴 감지나 profile 피드백이 불가.
+**Decision:**
+(1) **specialist-insights.jsonl** — JSONL append-only. 각 specialist consultation 후 status, confidence, surface, area_refs 스냅샷을 기록. 전체 observation 텍스트가 아닌 status + confidence만 저장 (패턴 감지에 충분, 파일 크기 최소화).
+(2) **Same-day dedup** — area+local_date별 최신 1개만 streak 계산에 사용. Day+agenda 같은 날 실행 시 fake streak 방지.
+(3) **Pattern types** — stable (3+ on-track), declining (3+ at-risk/needs-attention), shifted-up/down (이전 streak과 현재 status 비교). needs-watch는 declining에 포함. 3회 threshold: 2회는 우연, 5회는 피드백 지연.
+(4) **Survey-only reader** — day/agenda/review는 writer만. Pattern reading은 survey Phase 5.5에서만. 소비 명령어에 "3주째 at-risk입니다" 메시지는 specialist advice와 중복.
+(5) **Priority ordering** — 복수 area 패턴 시 1개만 선택: at-risk declining > needs-attention declining > shifted-down > shifted-up > stable.
+(6) **Proposal-only** — 패턴은 질문을 생성할 뿐 profile을 수정하지 않음. Confidence delta +0.05, cap 0.7. enrichment-rules.md 기존 workflow 재사용.
+(7) **Codex 합산 기여** — area_refs 스냅샷 (alias 변경 대비), same-day dedup, shifted-up/down 분리, priority ordering, agenda.md Write 권한 추가 등 Codex 계획에서 채택.
+**Consequence:** 1 new file (insight-accumulation ref) + 10 modified files. Life OS 피드백 루프 완성: profile → ontology → specialist → insight → survey catch-up → profile.
+
+## DR-097: PA Phase 16 — Nightly Gardening Daemon (Autopilot)
+
+**Date:** 2026-03-20
+**Status:** active
+**Context:** PA Life OS Phase 1-15 완성. 모든 명령이 수동 실행만 가능. Mac Mini에서 매일 자동 정비하면 vault가 상시 최적 상태 유지.
+**Decision:**
+(1) **2-layer 분리** — Infrastructure (QMD, shadow, hash-index: 스크립트만, AI 불필요) + Gardening (Claude headless: `/pa steward`). 인프라가 실패해도 가드닝은 독립 실행 가능.
+(2) **Report path split** (Codex 핵심 발견) — `.pa/`는 sync 제외이므로 리포트를 vault root에 visible note로 생성 (`PA Gardening Report.md`). Machine artifacts는 `.pa/autopilot/runs/`. System log는 `~/Library/Logs/ouroboros/`.
+(3) **Posture gate** — `automation_posture == "operate"`일 때만 Claude gardening 실행. 그 외 posture에서는 infra만. Unattended operate에서도 destructive = report-only.
+(4) **Auth preflight** — `claude auth status` 체크 → 실패 시 infra만 실행. Mac Mini에는 `claude setup-token`으로 장기 토큰 설정 필요.
+(5) **Lock** — `mkdir` 기반 lock dir. Cron 동시 실행 방지.
+(6) **`--append-system-prompt`** (Codex 제안) — "질문하지 말고 report-only" 무인 모드 제약을 Claude에 직접 주입.
+(7) **Built-in template** — 스크립트가 자체 default_template 함수로 렌더링. `templates/pa/gardening-report.md`는 reference 문서.
+(8) **BSD 호환** — Codex가 생성한 GNU sed/awk를 macOS BSD 호환으로 수정 (json_escape sed 단순화, awk → while read 루프).
+**Consequence:** 2 new files (script, template ref) + 4 modified files. Crontab 설정 후 매일 새벽 자동 vault 정비 가능.
+
+## DR-098: PA Phase 11b Completion — Shadow Vault Relocation + Read Deny
+
+**Date:** 2026-03-20
+**Status:** active
+**Context:** Phase 11b에서 5-layer privacy architecture를 구현했으나 Read deny가 보류됨. Shadow vault가 `.pa/shadow/`에 있어서 vault 전체 Read deny 시 shadow도 차단되는 구조적 문제.
+**Decision:**
+(1) **Shadow 외부 이전** — `.pa/shadow/` → `~/.cache/ouroboros/shadow/{vault-id}/`. macOS 표준 캐시 경로. `vault-id = {basename}-{sha256(realpath)[:8]}`로 multi-vault 지원. 재생성 가능 데이터이므로 cache가 적절.
+(2) **3-tier 경로 해결** — `PA_SHADOW_ROOT` env → `settings.json` `shadow_root` → fallback `~/.cache/ouroboros/shadow/{vault-id}/`. 유연한 override 가능.
+(3) **PreToolUse Read hook** — `hooks.json`에 Read matcher + `pa-read-guard.sh`. stdin에서 JSON 수신 (validate-url.sh와 동일 프로토콜). `deny-paths.json`이 없으면 즉시 통과 (PA 미사용자 영향 없음).
+(4) **Fail-closed** — deny 활성 상태에서 shadow 파일이 없으면 raw vault fallback 차단. Privacy 목적이므로 stale/missing shadow는 에러가 정답 (Codex 합산).
+(5) **Survey one-time exposure** — Phase 3 vault scan은 `Bash` tool (cat/head)로 수행, Read hook 우회. deny-paths.json 미생성 상태에서의 첫 survey는 Read 정상 동작.
+(6) **draft --revise 제한** — Read deny 활성 시 shadow에서 읽은 내용은 원본과 line-level divergence 가능 (날짜 일반화 등). revision은 proposal-only로 제한 (Codex 발견).
+(7) **deny-paths.json 삭제로 비활성화** — 사용자가 파일을 삭제하면 guard 비활성. 재생성은 `/pa survey` 재실행.
+**Consequence:** 2 new files (script, reference) + 12 modified files. 7개 command에 shadow_root 경로 통합. Live dogfooding 5건 모두 통과.
+
+## DR-099: PA Phase 17 — Soul Layer + Conversational Memory
+
+**Date:** 2026-03-22
+**Status:** active
+**Context:** OpenClaw 비교에서 두 핵심 gap 발견. (1) persona.json은 말투 설정일 뿐, 원칙/가치관/성격이 없어 "사람이라고 착각할 정도"에 미달. (2) 대화 중 신호("프로젝트 방향 바꿨어", "운동 못 하고 있어")가 세션 간에 소멸.
+**Decision:**
+(1) **Soul Layer** — `.pa/soul.md` = YAML frontmatter (기존 persona.json render fields, version 2) + markdown body (Principles, Personality, Relationship, Opinions). Frontmatter→presentation, body→reasoning. 기존 persona.json과 backward compatible (soul.md first, persona.json fallback, defaults).
+(2) **Init 5문 인터뷰** — 기존 3문 (speech/response/emoji) + 2문 추가 (Relationship, Principles). Q4-5는 skip 가능.
+(3) **Conversational Memory** — `.pa/memory/observations.jsonl` (append-only, 6종 signal taxonomy), 2-layer flush (Layer 1: pre-compact.sh에서 raw messages 추출 → .pending-flush.jsonl, Layer 2: 다음 PA command에서 LLM distill → structured observations), daily digest, session-start 주입.
+(4) **Memory는 proposal-only** — 직접 state 수정 안 함. enrichment proposal의 evidence, survey catch-up 인터뷰 프롬프트, chief-of-staff mood-energy 보조 판단.
+(5) **Privacy** — observations.jsonl에서 person 참조 시 mask_id 사용. .pending-flush.jsonl은 raw 포함 → 처리 후 즉시 삭제.
+**Consequence:** 4 new files (template, reference, 2 runtime state files) + 15+ modified files. Soul은 persona-response skill 확장, Memory는 personal-profiling skill 확장.
+
+---
+
+## DR-100: PA Phase 21A — Content Pipeline Architecture
+
+**Date:** 2026-03-24
+**Status:** active
+**Context:** `/pa ingest`는 URL/file/paste만 지원. PDF, DOCX, EPUB, 이미지 등 문서 파일을 vault에 가져오려면 텍스트 추출 파이프라인이 필요. 또한 YouTube, Raindrop 등 외부 소스도 동일한 파이프라인으로 통합해야 한다.
+**Decision:**
+(1) **content-pipeline skill 신설** — `skills/pa/content-pipeline/` 아래에 source-packet schema, extractor selection, connector contracts를 집중. 기존 capture-distillation은 건드리지 않고 새 skill로 분리.
+(2) **Source-packet 계약 확장** — 기존 `source_type`(url/file/paste)에 `youtube` 추가. 새 `source_format` 필드(pdf/docx/pptx/epub/image/youtube)로 세부 포맷 구분. `extractor`와 `metadata` 필드 추가.
+(3) **Shell script 추출기** — `pa-extract.sh`(문서), `pa-youtube.sh`(YouTube) 두 스크립트. 기존 `pa-*.sh` 패턴(action-based dispatch, die_user/die_system, safe-rm) 준수.
+(4) **Tool fallback chain** — PDF: markitdown → pdftotext. DOCX: markitdown → pandoc. EPUB: pandoc → markitdown. Image: Claude vision. `pa-extract.sh status`로 설치 상태 JSON 출력.
+(5) **Graceful degradation** — 추출 실패 시 stub note (메타데이터만). 도구 미설치 시 차선 도구로 자동 전환.
+(6) **survey.md 확장** — Phase 7에서 `pa-extract.sh status` + `pa-youtube.sh status` 실행하여 settings.json에 `content_pipeline.extractors` 기록.
+**Alternatives considered:** (a) 기존 capture-distillation skill 확장 — 범위가 다름 (distillation은 텍스트 처리, pipeline은 바이너리 추출). (b) 포맷별 별도 command (`/pa import-pdf`) — 불필요한 표면적 증가, ingest 하나로 통합이 낫다. (c) Abstract source adapter interface — premature abstraction, 구체적 스크립트가 먼저.
+**Consequence:** 3 new skill files + 2 new scripts + ingest.md/ingest-digest.md/distillation-rules.md/survey.md 수정. Curator와 librarian agent는 변경 없음.
+
+---
+
+## DR-101: PA Phase 21C — YouTube Ingestion
+
+**Date:** 2026-03-24
+**Status:** active
+**Context:** YouTube 영상은 vault의 주요 외부 지식 소스. URL만 WebFetch하면 페이지 HTML만 가져오지, transcript는 못 가져온다. 자막 없는 영상도 처리해야 한다.
+**Decision:**
+(1) **yt-dlp over YouTube API** — 로컬 CLI, API key 불필요, quota 제한 없음. `yt-dlp --write-auto-subs --sub-langs ko,en,en.*`로 자막 추출.
+(2) **Captionless fallback: mlx-whisper** — `uvx mlx_whisper`로 실행. 모델: `mlx-community/whisper-large-v3` (정확도 최우선). Apple MLX 네이티브라 whisper.cpp 대비 ~2x 빠름. SenseVoice Small(Alibaba, 15x faster 주장)은 한국어 WER 미검증으로 관찰만.
+(3) **Fallback chain** — yt-dlp auto-subs → mlx-whisper 로컬 전사 → metadata-only stub note. 3단계 degradation.
+(4) **VTT 파싱** — 자막 파일에서 타임스탬프, HTML 태그, 반복 라인 제거. 깨끗한 텍스트 출력.
+(5) **Metadata 추출** — `yt-dlp --print-json`으로 title, channel, duration, publish_date, view_count, description, has_subtitles 추출. ingest-digest 템플릿의 `youtube` source_shape에서 frontmatter로 사용.
+(6) **ingest-digest template 확장** — `source_shape: youtube` 추가. Frontmatter에 video_id, channel, duration_human, publish_date, transcription_method. Excerpt는 timestamp-anchored key segments (`### [MM:SS] Topic`).
+**Alternatives considered:** (a) YouTube Data API — OAuth/API key 필요, transcript API는 별도 인증, 불필요한 복잡도. (b) Whisper only (yt-dlp 스킵) — 자막 있으면 다운로드+전사 불필요, 자원 낭비. (c) SenseVoice Small 1순위 — 한국어 정확도 공개 벤치마크 부재, 검증 후 전환 고려.
+**Consequence:** `scripts/pa-youtube.sh` 신규. ingest.md Phase 1에 YouTube URL 감지 추가. ingest-digest.md에 youtube source_shape 규칙 추가.
+
+---
+
+## DR-102: PA Phase 21D — Consumption Journaling (Reflection Prompt)
+
+**Date:** 2026-03-24
+**Status:** active
+**Context:** `/pa ingest`는 외부 콘텐츠를 vault에 가져오지만, 단순 스크랩에 그친다. 사용자가 자기 생각을 붙여야 개인 지식이 된다. 이것이 "Consumption Journaling" — 읽은 것/본 것에 내 생각을 기록하는 습관.
+**Decision:**
+(1) **Inline reflection first, evening async second** — ingest 직후 AskUserQuestion으로 reflection 질문. 사용자 관심이 해당 콘텐츠에 있는 순간 질문하는 것이 응답률 극대화. 미응답 시 day evening에서 gentle reminder.
+(2) **Reflection prompts reference** — `skills/pa/content-pipeline/references/reflection-prompts.md`에 source_shape별 질문 템플릿 (url 4개, pdf 4개, youtube 3개, image 2개, paste 3개). 로테이션으로 반복 방지.
+(3) **`## My Thoughts` 섹션** — 사용자 응답을 digest note에 Edit으로 append. ingest-digest.md 템플릿에 슬롯 정의 (초기 렌더링에서는 생략, 응답 시 추가).
+(4) **`ingest-tracker.jsonl`** — append-only 추적. `{path, source_type, source_title, ingested_at, reflected, reflected_at, reflection_summary}`. work.jsonl/timeline.jsonl과 동일한 JSONL 패턴.
+(5) **Opt-out via settings** — `settings.json` `content_pipeline.reflection_prompts: false`로 비활성화 가능. `reflection_remind_evening: false`로 evening reminder만 끌 수 있음. 기본값: 둘 다 true.
+(6) **Consumption pattern analysis deferred** — "이번 달 AI 콘텐츠 70%" 같은 패턴 분석은 Phase 22 sentinel workflow로 확장. ingest-tracker.jsonl 데이터가 쌓인 후.
+(7) **Weekly compilation 연동** — compile.md Phase 3 source collection에서 ingest-tracker를 읽어 `## Consumption Log` 섹션 생성. reflected/unreflected 구분 표시.
+**Alternatives considered:** (a) 별도 `/pa reflect` 명령 — 불필요한 표면적 증가, ingest Phase 6에 통합이 자연스럽다. (b) 별도 reflection note — 노트 분산, digest note 안에 섹션으로 통합이 낫다. (c) 자동 reflection 생성 (AI가 대신 생각) — 목적에 반함, 사용자 자신의 생각이 핵심.
+**Consequence:** 1 new reference (reflection-prompts.md) + 1 new runtime state (ingest-tracker.jsonl). ingest.md, day.md, compile.md, ingest-digest.md, period-compilation.md 수정.
+
+---
+
+## DR-103: PA Phase 21B — Raindrop Integration
+
+**Date:** 2026-03-24
+**Status:** active
+**Context:** Raindrop.io는 북마크+하이라이트 관리 서비스. 저장한 글과 하이라이트를 vault에 자동으로 가져와서 Consumption Journaling에 연결하고 싶다.
+**Decision:**
+(1) **Raindrop-specific, not abstract adapter** — 각 서비스마다 고유 기능(하이라이트, 컬렉션, 태그)이 다르므로 추상 인터페이스는 premature. `pa-raindrop.sh` 구체 구현 먼저. connector-contracts.md에 공통 queue schema는 정의.
+(2) **Event-based queue** — `.pa/raindrop-queue.jsonl`에 `queued`/`ingested`/`skipped` 이벤트. 같은 bookmark_id에 대한 latest event로 상태 판단. append-only로 audit trail 보존.
+(3) **Highlights as first-class content** — Raindrop 하이라이트는 사용자의 사전 참여 신호. source-packet `raw_content`에 quote block으로 prepend, 템플릿에서 `## Highlights` 별도 섹션.
+(4) **`source_shape: bookmark`** — URL이지만 하이라이트/태그/컬렉션 메타데이터가 있으므로 별도 렌더링 경로. `metadata.connector` 존재 시 자동 파생.
+(5) **Tags 보수적 매핑** — Raindrop 태그를 frontmatter `raindrop_tags`에 저장. vault의 generic `tags`에 자동 머지하지 않음 (오염 방지).
+(6) **Token in ~/.config, state in .pa/** — 인증 정보는 사용자 레벨(`integrations.json`), sync cursor는 vault 레벨(`integrations-state.json`).
+(7) **Nightly scheduler sync** — `pa-scheduler.sh register raindrop-sync "0 22 * * *"`. Script runner, digest notify.
+**Alternatives considered:** (a) Abstract bookmark adapter — premature, 서비스 고유 기능을 무시. (b) Raindrop tags → vault tags 자동 머지 — vault tag namespace 오염. (c) Bidirectional sync — 복잡도 높고 불필요, pull-only.
+**Consequence:** 2 new files (pa-raindrop.sh, connector-contracts.md). ingest.md, ingest-digest.md, source-packet-schema.md, reflection-prompts.md, extractor-selection.md, SKILL.md 수정.
+
+---
+
+## DR-104: PA Phase 21E — Calendar Sync (gws CLI)
+
+**Date:** 2026-03-25
+**Status:** active
+**Context:** PA day/agenda는 timeline.jsonl로 시간 컨텍스트를 제공하지만, 실제 캘린더 이벤트(미팅, 약속)는 Google Calendar에만 있어 PA가 보지 못한다.
+**Decision:**
+(1) **timeline.jsonl과 분리** — `.pa/calendar-events.jsonl`에 별도 저장. timeline.jsonl은 curator-managed (vault 추출, confidence score), calendar events는 authoritative 외부 데이터. 혼합하면 추출 의미론이 오염됨. day/agenda에서 둘 다 읽어서 presentation layer에서 merge.
+(2) **gws CLI wrapper** — `pa-calendar.sh`가 `gws calendar events.list` 호출. OAuth는 user-managed (`gws auth setup`), PA가 인증을 관리하지 않음.
+(3) **Atomic rewrite sync** — 같은 날짜 범위 re-sync 시 기존 이벤트를 교체 (append가 아님). 이벤트는 수시로 변경/삭제되므로 스냅샷이 적합.
+(4) **Morning sync** — `pa-scheduler.sh register calendar-sync "0 6 * * *"`. 실시간 polling 불필요.
+(5) **Heartbeat** — 30h stale threshold. 주말 고려.
+(6) **Meeting prep deferred** — T-30m auto-brief는 다음 단계.
+**Alternatives considered:** (a) timeline.jsonl에 merge — curator 데이터 오염. (b) icalBuddy — 사용자 미사용. (c) 실시간 polling — 불필요한 복잡도.
+**Consequence:** 1 new script (pa-calendar.sh). day.md, agenda.md, heartbeat.sh, chief-of-staff.md 수정. calendar-events.jsonl + integrations-state.json 확장.
+
+---
+
+## DR-105: PA Phase 21F — Cross-Module Bridge
+
+**Date:** 2026-03-25
+**Status:** active
+**Context:** SWE spiral과 Core research가 유용한 기술 결정과 지식을 생산하지만, 사용자의 개인 vault에는 도달하지 않아 지식 사일로가 생긴다.
+**Decision:**
+(1) **Explicit proposal, never automatic** — spiral archive/research merge 후 사용자에게 제안. 자동 hook 없음. Vault에 뭘 넣을지는 사용자가 결정.
+(2) **`.pa/settings.json` gate** — PA 모듈 존재 여부로 제안 활성화. 없으면 조용히 skip.
+(3) **`/pa ingest`로 전달** — 구조화된 요약을 paste-type input으로 ingest 파이프라인에 전달. 별도 write path 없이 기존 curator/dedup/rendering 재사용.
+(4) **PA→SWE read-only** — `/pa brief`가 `docs/specs/project/`를 읽어 enrichment. PA가 SWE 파일에 쓰지 않음.
+(5) **bridge-contracts.md** — 3 routes를 한 reference에 정의. 각 command는 참조만.
+**Alternatives considered:** (a) Automatic hook — PA trust boundary 위반. (b) Bidirectional sync — 불필요한 coupling. (c) 별도 `/bridge` command — 기존 command에 embedding이 자연스러움.
+**Consequence:** 1 new reference (bridge-contracts.md). spiral.md (Phase 10.7), research.md (Phase 7.5 + Skill), brief.md (SWE enrichment) 수정.
+
+## DR-106: Collaboration-First Dual-Model Protocol
+
+**Date:** 2026-03-28
+**Status:** active
+**Context:** DR-028/029/030 define routing and invocation mechanics. DR-072 establishes Codex exec as the external model interface. During v2.0.0 Phase 0-3 implementation, a working collaboration pattern emerged: parallel independent planning → merge → direction-only delegation → autonomous execution → bounded peer review → selective user escalation. This pattern materially improved output quality and reduced user burden compared to single-model or micromanaged dual-model approaches. The pattern needs to be first-class and portable.
+**Decision:** Collaboration is the default posture for non-trivial work when an external model is available. Default delegation level is `auto`. Controller (Claude) owns alignment, contract, merge, and review. Executor (Codex) owns delegated scope until review. Direction-only delegation by default — pass goals, constraints, boundaries, and verbatim invariants, not preferred implementations. Ownership handoff is clean — no mid-flight re-steering. Review is bounded to 2 rounds. User arbitrates only genuine ambiguity. Single-model remains correct for trivial, sensitive, or unavailable cases. Command-level `--multi` opt-in is unchanged and not superseded.
+**Consequence:** New `skills/core/collaboration/` skill (SKILL.md + collaboration-protocol.md reference). CLAUDE.md operational adapter. AGENTS.md portable subset. Clear separation between collaboration methodology (this DR) and external-model routing mechanics (DR-028/030).
+
+## DR-107: Evaluation Consensus: Stricter Score Default
+
+**Date:** 2026-03-29
+**Status:** active
+**Context:** The previous majority path resolved evaluation splits by defaulting to Claude on ties.
+That masked legitimate quality misses in boundary cases, especially when Codex applied a stricter but rubric-defensible reading.
+Self-evaluation leniency is a known risk in this pipeline, so the default should not favor the host model when evidence is contested.
+**Decision:** Change the evaluation consensus default from Claude-wins-ties to stricter-score-wins.
+For mechanical and structural criteria, the lower score wins unless the higher scorer cites direct satisfying evidence.
+For qualitative criteria, the split remains unresolved, but the stricter score is still the default unless the models disagree on facts rather than thresholds.
+When a single fallback verdict is required, use the more conservative outcome.
+**Rationale:** Boundary cases should be treated as not-yet-passing because the split itself signals that the component is sitting on the rubric edge.
+Codex's stricter readings are often defensible under the written criteria, and defaulting to stricter outcomes better resists self-evaluation leniency bias.
+**Consequence:** `consensus-protocol.md` now defaults to stricter scores on splits.
+Evaluation relay outputs are normalized before consensus so the controller compares one canonical shape instead of model-specific JSON variants.
+
+## DR-108: Command Criteria v2 — Measurement Fix Bundle
+
+**Date:** 2026-03-30
+**Status:** active
+**Context:** Multi-model evaluation splits on E1/E2/E3/F3 were caused by ambiguous criterion boundaries, not real quality disagreement.
+E1 penalized orchestration script calls as "implementation detail."
+E2 penalized mode-specific structural repetition.
+F3/E3 produced evaluator variance where the score flipped without any content change.
+**Decision:** Rewrite 6 command criteria (F3, Q4, Q5, E1, E2, E3) as a `measurement fix` bundle.
+Add the Criterion-Local Evidence Rule, the Boundary Criteria Exception in the consensus protocol, and Rubric-Change Governance requiring `measurement fix` vs `policy shift` classification for all future rubric changes.
+**Key changes:**
+- E1: "No inline Bash" → "invocation mechanics vs evolvable logic" boundary
+- E2: "No redundancy" → "structural economy" allowing mode-specific repetition when branches materially differ
+- Q4: "markdown template" → "reconstructable output contract" (template/list/reference)
+- Q5: absorbs machine-consumer contract from old E3
+- E3: narrowed to system integration only
+- F3: simplified to "at least 1 stop-and-ask boundary"
+**Calibration result:** Split rate improved from 80% to 17% on the targeted criteria.
+E1 is now resolved, with both models scoring 1.
+The remaining Q4 split is a legitimate disagreement caused by real output underspecification rather than rubric ambiguity.
+**Classification:** `measurement fix` — severity thresholds and the pass bar are unchanged.
+**Alternatives considered:** (1) Keep the old criteria and accept persistent splits — rejected because the criteria were measuring form rather than substance.
+(2) Lower the bar to eliminate all splits — rejected because the remaining Q4 split reveals a real defect worth fixing.
+**Consequence:** Existing baselines require rebaseline under `command-criteria-2026-03-30`.
+
+## DR-109: v3.1.0 RnD Literature-Only MVP
+
+**Date:** 2026-04-08
+**Decision:** Implement the 4th ouroboros module `rnd` as a bounded autonomous literature research agent with 10-stage state machine, 3 agents (collector/investigator/critic), external loop driver, and generalized core evaluation scripts.
+**Key choices:**
+- Single command (`commands/rnd.md`) instead of sub-command split — MVP simplicity, split deferred
+- `name: rnd` (router pattern, same as `pa`) — not `rnd:study`
+- 3 agents: collector(sonnet), investigator(opus), critic(opus) — minimal generator-evaluator separation
+- WebSearch/WebFetch for MVP — Semantic Scholar adapter contract defined, implementation deferred to v3.2.0
+- Wall-clock hard cap, token soft estimate — Claude Code doesn't expose token counts
+- `rnd-loop.sh` external driver (ralph.sh pattern) — enables multi-session autonomous research
+- Channels available (Research Preview) for parallel probes — `--dangerously-load-development-channels`
+- Core script generalization: eval-normalize.sh arbitrary criterion IDs, eval-consensus.sh configurable boundary, kb-similarity.sh --corpus param
+**Cross-module reuse:** Core research scope/collection/perspectives patterns, source-evaluation.md, routing stack, PA content-pipeline source-packet, SWE artifact contract pattern (adapted).
+**Anti-patterns:** No PA librarian reuse (QMD binding), no spiral-state.sh direct reuse (SWE hardcoding), no PA privacy machinery.
+**Alternatives considered:** (1) Sub-command split per stage — rejected for MVP complexity. (2) Semantic Scholar API — rejected for parsing overhead. (3) 10 agents (one per stage) — rejected as over-engineering.
+**Consequence:** New module directory `commands/rnd.md`, `agents/rnd/`, `skills/rnd/`, `scripts/rnd-*`, `templates/rnd/`. Eval scripts backward compatible.
+
+## DR-110: v3.2.0 Branch Search + Pruning
+
+**Date:** 2026-04-08
+**Decision:** Add parallel hypothesis exploration with evaluation-based pruning to the RnD pipeline as an overlay on the existing 10-stage state machine.
+**Key choices:**
+- Branch = tension-point cluster (Codex insight), not individual hypothesis — 3-4 branches maps cleanly to max_parallel=3
+- B1-B4 rubric (0-2 scale, Codex design) for branch scoring — simpler than 5-component 0-1 model
+- Wave-based parallelism without Channels — parallel Agent() calls + parallel.sh fan-out/fan-in
+- state.json compact summary + separate queue.json for mutable branch detail (Codex insight) — follows state/budget/handoff split pattern
+- branch-ledger.jsonl as archive artifact (Codex insight) — append-only audit trail like experiment-ledger.jsonl
+- rnd-branch.sh as separate lifecycle manager (Claude design) — session/budget/branch 3-script separation
+- `--branch auto` default (confirmed by user) — 3+ hypotheses activates, `off` preserves v3.1.0
+- Reserve probes as budget.json field — ML-05 dogfooding insight, `max(2, ceil(probe_budget * 0.15))`
+- No new agent — existing investigator + critic handle branch grouping and scoring
+**Design process:** Claude Plan agent + Codex independent analysis → cross-verification → merged plan.
+**Alternatives considered:** (1) Branch = individual hypothesis — rejected, tension-point cluster gives better parallelism granularity. (2) New branch-scorer agent — rejected, existing critic handles B1-B4. (3) Channels for parallelism — not available (Research Preview). (4) All branch state in state.json — rejected, queue.json separation is cleaner.
+**Consequence:** 4 new files + 11 modified. Evaluation L4 maintained (F:5/5 Q:7/7 E:3/4). E2 split on structural economy is a pre-existing v3.1.0 pattern.
+
+## DR-111: v3.3.0 Cumulative Prior-Work Memory
+
+**Date:** 2026-04-08
+**Decision:** Add cross-study memory via `.rnd/archive-index.json` so new studies benefit from prior study findings.
+**Key choices:**
+- Index schema shaped to fit kb-similarity.sh `_json_entries` parser (`.studies[]`, `.path`, `.title`, `.tags`, `.summary`) — zero changes to similarity script
+- Rich composite summary (question + executive summary + claims + gaps + next questions) from Codex insight — better term-overlap recall
+- 3-point integration only (Phase 3 novelty, Phase 5 reuse, Phase 13 update) — Codex proposed 6 points but that's over-scoped for MVP
+- Novelty check is advisory, not blocking — Phase 4 human checkpoint decides
+- Archive is context, not evidence (Codex insight) — new study must earn own evidence chain
+- Tags auto-derived from question terms — no manual tagging workflow
+- Only completed studies indexed — active/stopped excluded for quality signal
+- Evaluator exemplar growth deferred to v3.3.1+
+**Design process:** Claude Plan agent + Codex independent analysis → cross-verification → merged plan.
+**Alternatives considered:** (1) 6-point phase integration — rejected as over-scoped. (2) `follow_on` novelty classification — deferred, simple advisory sufficient. (3) Structured reuse packets — deferred, reading report summaries sufficient for MVP.
+**Consequence:** 2 new files + 4 modified. kb-similarity.sh unchanged. Archive works with 0, 1, or N completed studies.
+
+## DR-112: v3.4.0 Report/Paper + Peer Review
+
+**Date:** 2026-04-09
+**Decision:** Add multi-model adversarial review, academic report option, BibTeX citation export, and reproducibility README to the RnD pipeline.
+**Key choices:**
+- Adversarial review is the core value, not paper formatting — Phase 11 upgraded from optional tie-breaker to genuine independent second opinion
+- DR-107 lower-score consensus + 3-tier blocker merge (confirmed/blocking/minority concern) from Codex independent analysis
+- `--paper` flag with `report_format` state.json persistence — opt-in, default behavior unchanged
+- Academic template keeps `## Executive Summary` for archive-index.sh compatibility (Codex risk analysis)
+- BibTeX from cited subset only, not all accepted sources — `@misc` default, promote to `@article`/`@techreport` when metadata supports it
+- review.md archive-compatible mirror sections (Codex discovered archive-index.sh heading parser dependency)
+- Budget charging: charge on relay completion (success or parse failure), not on transport failure
+- All Phase 13 additions (citation, README, archive index) are non-blocking on failure
+- No third judge, no review.json sidecar, no LaTeX/PDF in v3.4.0
+**Design process:** Claude Plan agent + Codex independent analysis → cross-verification → merged plan. 3-round multi-model evaluation (L2 → L2 → L3 consensus, both independent L4). Codex found 7 issues across 2 rounds, all resolved.
+**Alternatives considered:** (1) prior-work-map.json sidecar for richer source metadata — Codex proposed, scoped out as over-engineering for v3.4.0. (2) 17-file scope from Codex analysis — reduced to 10 files (4 new + 6 modified). (3) eval-consensus.sh for mechanical consensus — rejected, inline application of peer-review-protocol.md rules is clearer.
+**Consequence:** 4 new files + 6 modified. 10 files total, +1005 lines. Backward compatible via `--single` and fallback modes.
+
+## DR-113: v3.5.0 Meta-Research
+
+**Date:** 2026-04-09
+**Decision:** Add cross-study metrics extraction, advisory suggestion generation, and evaluator recalibration signals to the RnD pipeline. This completes the 5-phase RnD roadmap (MVP → Branch → Memory → Paper → Meta-research).
+**Key choices:**
+- Entry point is `--meta` subcommand of `/rnd` (status/extract/analyze/suggest), not a separate command — follows existing `--list`/`--status`/`--resume` routing pattern
+- No new agent — investigator + critic reused for meta-research synthesis and advisory-only validation
+- Script-first extraction (`rnd-meta.sh` 847 lines), agent for synthesis — deterministic jq for metrics, judgment for cross-study analysis
+- Auto-extract at Phase 13 completion (non-blocking) — study-metrics.json always available without manual invocation
+- 6-category suggestion taxonomy (SUG-BDG/STG/PRB/CAL/PRC/PRM) with deterministic triggers
+- Graduated confidence (N=1 observation → N=2 tentative → N=3-4 moderate → N=5+ strong) — prevents premature optimization from sparse data
+- Advisory-only boundary enforced at 3 levels: Phase 14 critic validation, meta-research-contract.md, SKILL.md decision rule
+- Stage durations: budget.json phases preferred, state.json transitions as fallback — handles sparse wall-clock data
+- archive-index.json extended with 3 nullable fields (stage_durations, budget_utilization, meta_lesson_count) — backward compatible
+- Evaluator recalibration signals (ceiling/floor collapse, range compression) require 3+ studies — defers action until data supports it
+- Exemplar identification deferred to v3.5.1+ (needs 5+ studies)
+**Design process:** Claude Plan agent + Codex independent analysis (Codex started implementing rnd-meta.sh instead of analyzing, script patterns used during implementation). Dual-model evaluation: L4 maintained (30/32, Q5 1→2).
+**Alternatives considered:** (1) Separate meta-analyst agent — rejected, investigator+critic sufficient. (2) meta-learning.json structured sidecar — deferred, extraction captures what's needed. (3) Extraction-only scope without agent analysis — user chose full scope. (4) Manual-only extract — user chose auto-extract at Phase 13.
+**Consequence:** 5 new files + 7 modified. 12 files total, +1553 lines. Backward compatible via nullable fields and non-blocking extraction. RnD Phase Roadmap complete.
+
+## DR-114: v2.8.0 Session Archive Phase 1 Foundation
+
+**Date:** 2026-04-10
+**Decision:** Add a raw Claude session archive foundation under `${CLAUDE_PLUGIN_DATA}/session-archive/` using SQLite FTS5, enqueue-only SessionEnd ingestion, and visible-segment indexing with subagent support.
+**Key choices:**
+- Storage root is fixed to `${CLAUDE_PLUGIN_DATA}/session-archive/`.
+- Storage backend is SQLite FTS5 raw indexing only, and QMD remains reserved for the Phase 3 wiki tier.
+- The SessionEnd hook only enqueues transcript paths, and `sync` is the only parser/indexer action.
+- Thinking blocks are fully dropped.
+- Local-command wrappers map to `segment_kind='meta'` with `is_meta=1` and stay excluded by default.
+- `Bash`, `Grep`, `Agent`, and `Task*` tool results keep capped stdout-like text, while `Read`, `Write`, `Edit`, and `Glob` keep metadata only.
+- Subagent transcripts under `<session-id>/subagents/*.jsonl` are indexed in Phase 1.
+- The default rebuild window is `30d`.
+- FTS rows are rebuilt explicitly after each transactional source replace because defensive SQLite rejects trigger-based virtual-table writes as unsafe.
+- The first non-meta segment in a source gets a single fallback `command_hint="session"` anchor only when no stronger route hint exists, which preserves generic session recall without synthetic rows.
+- Hook and sync behavior stay fail-open.
+**Design process:** The implementation followed the user-approved locked plan and reused repository patterns from `scripts/learning-session-end.sh` and `scripts/learning-lib.sh`.
+**Alternatives considered:** (1) QMD as the raw transcript store — rejected because raw transcript indexing stays outside the Phase 3 wiki tier. (2) Direct parsing in the SessionEnd hook — rejected because enqueue-only ingestion protects session termination. (3) Trigger-based FTS maintenance — rejected in implementation because the platform SQLite build blocks unsafe virtual-table writes from triggers.
+**Consequence:** 5 new files and 4 modified files deliver the Phase 1 archive foundation, while PA integration, RnD integration, and wiki promotion remain future phases.
+
+## DR-115: v2.8.0 Session Archive Phase 2 PA + RnD Integration
+
+**Date:** 2026-04-11
+**Decision:** Integrate the Phase 1 raw session archive into PA context assembly and RnD prior-work flow as fail-open advisory context, without changing the Phase 1 archive API or schema.
+**Key choices:**
+- PA librarian owns the Bash access boundary and runs only read-only `scripts/session-archive.sh status` and `search`; PA commands keep delegation-only contracts.
+- PA retrieval becomes four-lane retrieval: literal, semantic, situational, and session.
+- Heterogeneous reciprocal-rank fusion uses rank position, `1 / (k_rrf + rank_in_lane)` with `k_rrf=60`, while vault notes and session segments render in separate sections.
+- Session profile configuration uses nested `session_lane` objects with `enabled`, `k`, `max_excerpt_chars`, and `filters`.
+- `session_lookup.status` is an enum: `hits`, `no_hits`, `unavailable`, or `disabled`.
+- Session search defaults to `--agent main`.
+- `/pa day` keeps the session lane disabled by default unless the profile explicitly opts in.
+- Session citations use `[S1]`, `[S2]`, and a separate `### Session Sources` table.
+- RnD Phase 3 uses session hits as advisory novelty context, and Phase 5 packages them as `session_prior_work[]`.
+- RnD Phase 5 searches `--component rnd` first, then falls back to `--component research` when hits are sparse, deduplicating by `segment_id`.
+- Session archive reads do not consume web search, web fetch, or probe budget.
+- `conversation-session` is always `context-only` and can seed questions or objections but never support report claims directly.
+**Design process:** The implementation followed the user-approved locked plan, preserving Phase 1 files and existing command-to-agent contracts while adding only consumer-side integration.
+**Alternatives considered:** (1) Command-level Bash prefetch in ask/brief/day — rejected because it would duplicate lane logic and split retrieval ownership. (2) Raw BM25 fusion — rejected because QMD and session archive scores are heterogeneous. (3) Rendering session hits inside retrieved documents — rejected because conversation evidence must not look like vault evidence. (4) Counting session hits as RnD sources — rejected because prior conversation is context, not independent evidence.
+**Consequence:** 12 existing files changed. PA can surface prior conversation snippets beside vault evidence, RnD can reuse prior discussion as advisory prior-work context, and Phase 3 wiki promotion remains the next v2.8.0 milestone.
+
+## DR-116: v2.8.0 Session Archive Phase 3 Wiki Promotion
+
+**Date:** 2026-04-11
+**Decision:** Add a proposal-only session-wiki promotion tier under `${CLAUDE_PLUGIN_DATA}/session-archive/wiki/`, managed by the new `/session-wiki` command and `agents/core/session-synthesizer.md`, with the QMD `session-wiki` collection registered manually by the user.
+**Key choices:**
+
+- Wiki pages live at `wiki/<project_slug>/<page_type>/<slug>.md` with `page_type` in `{components, topics, decisions, patterns}`.
+- Proposals are directory bundles under `proposals/PROMO-<ts>-<slug>/` with `manifest.json`, `bundle.json`, `pages/`, `preimage/`, and `review.md`.
+- Draft synthesis delegates to `agents/core/session-synthesizer.md`; raw scribe and researcher are NOT reused.
+- QMD collection registration is manual only; `wiki-status` prints the exact shell command.
+- `/session-wiki apply <id>` is the only wiki-write path, with preimage hash check before every write.
+- Proposal-only gate is session-wiki-local, parallel to but independent of DR-075 PA posture.
+- Drift defense is structural lint only (`wiki-lint`); semantic contradiction detection is deferred.
+- Grouping cascade: `task_key` → `component_hint` → `topic`.
+- Minimum thresholds: 5 segments, 2 sessions, 1 span-day, 1 text segment.
+- Per-proposal caps: 3 typical pages, 5 hard cap.
+- Citation marker inside wiki pages is `[SA<n>]`, disambiguated from PA librarian `[S<n>]`.
+- RnD Phase 5 optionally queries `session-wiki` via `mcp__qmd__query` when registered, packaging results as `session_wiki_prior_work[]` ranked before raw `session_prior_work[]`; both stay `conversation-session` context-only.
+- PA librarian does NOT add a default 5th session-wiki lane; opt-in via `retrieval-profiles.json` only.
+- No `.mcp.json` changes.
+- All flows fail-open per Phase 1/2 discipline.
+
+**Design process:** The implementation followed the user-approved locked plan, synthesizing independent Claude + Codex plans. Architecture forks (synthesis agent, QMD registration) were user-decided in favor of Codex's conservative recommendations.
+**Alternatives considered:** (1) Reuse PA scribe for synthesis — rejected; vault-voice biased. (2) Reuse core researcher — rejected; knowledge-base learning biased. (3) Auto QMD registration in `init` — rejected; violates DR-114 `.mcp.json` discipline. (4) PA librarian 5th lane default-on — rejected; blurs authority, deferred to Phase 4+. (5) Vault folder storage — rejected; violates SKILL.md:98 "outside any PA vault collection". (6) Per-page JSONL proposals — rejected; directory bundles preserve bundle semantics better.
+**Consequence:** 6 new files and 6 modified files deliver Phase 3. The session archive now has a complete Karpathy 3-layer (raw → wiki → schema) model with proposal-only promotion. Phase 4+ may revisit native PA 5th lane, scheduled proposals, and semantic contradiction detection.

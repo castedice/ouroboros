@@ -71,6 +71,12 @@ description: |
 |---|---|---|---|
 | `name` | string | Skill identifier, lowercase hyphenated | `evaluation-methodology` |
 | `description` | string | Third-person trigger phrases | See below |
+| `summary` | string | One-sentence skill summary, ≤25 words, no trigger phrases | `Guides evidence-first component scoring with binary criteria and tier gates.` |
+| `version` | integer | Schema version for update detection (not plugin SemVer) | `1` |
+| `tags` | list | 3-6 lower-case hyphenated keywords, module prefix first | `[core, methodology, evaluation, scoring]` |
+| `preamble_tier` | integer | Loading priority: 1=leaf, 2=standard, 3=decision-heavy, 4=meta | `4` |
+
+Field order in frontmatter: `name`, `description`, `summary`, `version`, `tags`, `preamble_tier`.
 
 ### Description Field Pattern
 
@@ -105,22 +111,48 @@ description: This skill provides validation methodology knowledge.
 
 ## Command Frontmatter
 
+### Required Fields
+
+| Field | Type | Description | Example |
+|---|---|---|---|
+| `name` | string | Path-derived command name | `core:evaluate` |
+| `description` | string | Trigger-style help text that starts with `Use when` | `Use when you need to score plugin component quality` |
+
 ### Recommended Fields
 
 | Field | Type | Description | Example |
 |---|---|---|---|
-| `description` | string | One-line command purpose | `Evaluate plugin component quality` |
 | `allowed-tools` | list | Tools the command may use | `Read, Grep, Glob, Task` |
 | `argument-hint` | string | Expected argument format | `<component-path> [--focus C1,C2]` |
 
-### Key Distinctions
+### `name` Rules
 
-Commands have no strictly required frontmatter fields — all are recommended. This reflects the command's explicit invocation model: users type `/command-name`, so discoverability through frontmatter is less critical than for agents and skills.
+| Rule | Requirement |
+|---|---|
+| Path derivation | `commands/core/evaluate.md` -> `name: core:evaluate` |
+| Standard regex | `^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$` |
+| Router exception | `commands/pa.md` -> `name: pa` |
+| Legacy prefix | `ouroboros:` fails validation |
 
-However, `description` is strongly recommended because:
+### `description` Trigger Convention
 
-- It appears in `/help` output
-- It helps the AI understand command purpose for orchestration
+Command `description` is required and must start with `Use when`.
+Describe the user's trigger or intent, not the command's internal workflow.
+Words such as `Stage`, `composite`, `orchestrate`, and `meta-composite` are warning signs that the line is drifting into summary text.
+
+```yaml
+# GOOD
+description: Use when you need to score plugin component quality
+
+# BAD — summary instead of trigger
+description: Evaluate plugin component quality — static definition scoring, output quality assessment
+
+# BAD — workflow language
+description: Specification composite — orchestrate Stages 1-4
+```
+
+Trigger-style descriptions matter because `/help` should expose user intent quickly.
+They also improve routing because the command advertises when to use it instead of how it works internally.
 
 ### `allowed-tools` Semantics
 
@@ -130,27 +162,40 @@ However, `description` is strongly recommended because:
 - User permission mode still applies — listed tools are not auto-approved
 - Unlisted tools are blocked even if the user would approve them
 
-### `name` Field Override
+### DO / DON'T
 
-The `name` field in commands is optional and should only appear when:
+| DO | DON'T |
+|----|-------|
+| Add a path-derived `name` to every command | Omit `name` on commands that do not collide with built-ins |
+| Start `description` with `Use when` | Write a workflow summary instead of a trigger |
+| Use intent language in `description` | Lead with `Stage`, `composite`, `orchestrate`, or `meta-composite` |
+| Follow minimum privilege for `allowed-tools` | List all available tools "just in case" |
+| Provide `argument-hint` when input shape matters | Leave argument shape implicit when users need guidance |
 
-1. The filename collides with a built-in command
-2. A namespace prefix is needed
-
-```yaml
 ---
-name: workflows:plan
-description: Generate implementation plan for a task
----
-```
+
+## Template Frontmatter
+
+### Recommended Fields
+
+| Field | Type | Description | Example |
+|---|---|---|---|
+| `title` | string | Template display name | `Focus Brief` |
+| `description` | string | One-line template purpose | `Structured dossier template for a topic, project, or person` |
+
+### Key Distinctions
+
+Templates are rendering specifications — they define output shape, not behavior. Unlike skills and agents, templates have no trigger mechanism or model selection. Their frontmatter is minimal because they are always explicitly invoked by a command.
+
+A template requires both `title` and `description` to be self-documenting. The description should explain what the template produces, not what command calls it.
 
 ### DO / DON'T
 
 | DO | DON'T |
 |----|-------|
-| Add `name` only for collision avoidance | Add `name` to every command (unnecessary noise) |
-| Follow minimum privilege for `allowed-tools` | List all available tools "just in case" |
-| Write specific `description` ("Evaluate plugin quality") | Write generic description ("Does evaluation") |
+| Include both `title` and `description` | Leave frontmatter empty or with only `title` |
+| Write specific `description` ("Period synthesis template for timestamp notes") | Write generic description ("A template for notes") |
+| Keep frontmatter minimal — templates are invoked, not discovered | Add `model`, `tools`, or `allowed-tools` (templates don't execute) |
 
 ---
 
@@ -162,7 +207,7 @@ description: Generate implementation plan for a task
 |---|---|---|---|
 | `matcher` | string | Tool name or OR pattern | `Write\|Edit` |
 | `type` | string | Hook type | `command` |
-| `command` | string | Script to execute | `${CLAUDE_PLUGIN_ROOT}/scripts/fmt.sh` |
+| `command` | string | Script to execute | `bash <plugin-root>/scripts/fmt.sh` |
 | `timeout` | number | Max execution time in seconds | `30` |
 
 ### Recommended Fields
@@ -174,48 +219,12 @@ description: Generate implementation plan for a task
 ### Valid Event Types
 
 Claude Code supports 17 hook events across 4 categories:
-
-**Session lifecycle:**
-
-| Event | When It Fires | Common Use |
-|---|---|---|
-| `SessionStart` | Session begins, resumes, or context reloads | Context injection, status display |
-| `SessionEnd` | Session closes (only `command` type hooks) | Cleanup, state persistence |
-| `Stop` | Agent completes a turn | Completion checks, status updates |
-
-**Tool lifecycle:**
-
-| Event | When It Fires | Common Use |
-|---|---|---|
-| `PreToolUse` | Before a tool executes | Security validation, permission checks |
-| `PostToolUse` | After a tool completes successfully | Auto-formatting, logging |
-| `PostToolUseFailure` | After a tool fails | Error tracking, recovery |
-| `PermissionRequest` | Tool requires user permission | Auto-approval policies |
-
-**User interaction:**
-
-| Event | When It Fires | Common Use |
-|---|---|---|
-| `UserPromptSubmit` | When user submits a prompt | Context injection, mode setting |
-| `Notification` | When a notification is generated | Custom alerting |
-| `PreCompact` | Before context compaction | State preservation, summary generation |
-
-**Agent and team:**
-
-| Event | When It Fires | Common Use |
-|---|---|---|
-| `SubagentStart` | When a subagent spawns | Monitoring, configuration |
-| `SubagentStop` | When a subagent completes | Output capture, result logging |
-| `TeammateIdle` | When a teammate goes idle | Work assignment, coordination |
-| `TaskCompleted` | When a task is marked completed | Progress tracking |
-
-**Configuration and workspace:**
-
-| Event | When It Fires | Common Use |
-|---|---|---|
-| `ConfigChange` | When configuration changes | Setting validation |
-| `WorktreeCreate` | When a git worktree is created | Workspace setup |
-| `WorktreeRemove` | When a git worktree is removed | Workspace cleanup |
+Session lifecycle: `SessionStart`, `SessionEnd`, `Stop`.
+Tool lifecycle: `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`.
+User interaction: `UserPromptSubmit`, `Notification`, `PreCompact`.
+Agent and team: `SubagentStart`, `SubagentStop`, `TeammateIdle`, `TaskCompleted`.
+Configuration and workspace: `ConfigChange`, `WorktreeCreate`, `WorktreeRemove`.
+Choose the narrowest matching event instead of relying on broad catch-all wiring.
 
 ### Timeout Guidelines
 
@@ -230,7 +239,7 @@ Claude Code supports 17 hook events across 4 categories:
 | DO | DON'T |
 |----|-------|
 | Always specify `timeout` | Omit timeout — risks infinite hang |
-| Use `${CLAUDE_PLUGIN_ROOT}` in `command` paths | Hardcode absolute paths |
+| Use the plugin-root variable in `command` paths | Hardcode absolute paths |
 | Target specific tools in `matcher` | Use wildcard `*` matcher |
 | Include `description` for documentation | Leave hooks undocumented |
 | Handle JSON parse failure with `exit 0` | Let script crash on malformed stdin |

@@ -1,7 +1,8 @@
 ---
-description: Upgrade ouroboros from upstream — fetch changes, reconcile with local customizations, validate, and apply
+name: core:upgrade
+description: "Use when you need to pull upstream ouroboros changes into a customized local plugin and reconcile them safely"
 argument-hint: [--check] [--source <path>] [--single]
-allowed-tools: Read, Glob, Grep, Bash, Write, Edit, Task
+allowed-tools: Read, Glob, Bash, Write, Edit, Task
 ---
 
 # Upgrade — Ouroboros Self-Update
@@ -17,6 +18,16 @@ Target: $ARGUMENTS
 | 4 | reconciler + Bash background (--multi) | High-level change classification + resolution strategies (parallel with Codex when --multi) |
 | 5 | reconciler + Bash background (--multi) | Per-conflict 3-way merge or overlap analysis (parallel with Codex when --multi) |
 | 7 | evaluator + Bash background (--multi) | Before/after validation of merged conflict files (parallel with Codex when --multi) |
+
+## Delegation Contracts
+
+| Invocation | Input | Instructions | Expected Output |
+|------------|-------|--------------|-----------------|
+| Phase 4 reconciler | Diff manifest from Phase 2, customization map from Phase 3, relevant decision-entry contents, and `skills/core/routing/references/relay-prompt-templates.md` when `--multi` is active | Apply `agents/core/reconciler.md` Procedure 1 for upgrade reconciliation. Validate conflict classes, preserve intent from `docs/decisions/`, and mark any case that needs full 3-way merge. | Upgrade Reconciliation Report with `validated_classifications`, `resolution_strategy` per conflict, `detail_merge_required`, and `notes`. |
+| Phase 5 reconciler for `CONFLICT-A` | Base, upstream, and local file contents plus related decision entries | Apply `agents/core/reconciler.md` merge analysis workflow. Preserve user intent, isolate upstream deltas, and produce merged content plus annotations. | Component Merge Spec with `path`, `merged_content`, `preserved_customizations`, `open_questions`, and `validation_risk`. |
+| Phase 5 reconciler for `CONFLICT-B` | Upstream file, local overlapping file, and the decision entry that created the local file | Apply `agents/core/reconciler.md` overlap analysis plus `skills/core/brainstorming/references/divergent-techniques.md` for alternative synthesis. Return three bounded options only. | Overlap Resolution Spec with exactly three options: `keep_local`, `adopt_upstream`, and `merge_both`, each with trade-offs and a recommended choice. |
+| Phase 7 evaluator | Before content, after content, component type, and `skills/core/evaluation/references/{type}-criteria.md` | Apply the comparative evaluation path from `commands/core/evaluate.md` Mode C. Check regressions, position-swap bias, and preserved quality. | Validation payload with before score, after score, verdict, regressed criteria, and a short rationale suitable for Phase 9 review. |
+
 
 ## Phase 1: Parse Input
 
@@ -40,6 +51,29 @@ If `--source <path>` provided:
 2. Verify it contains ouroboros structure (check for `.claude-plugin/plugin.json` or `commands/core/`)
 3. If invalid → Error: "Error: '{path}' is not a valid ouroboros directory. Expected `.claude-plugin/plugin.json` or `commands/core/`."
 4. Abort
+
+## Shared References & Payload Contracts
+
+| Artifact | Path | Role |
+|----------|------|------|
+| Parallel execution pattern | `skills/core/routing/references/parallel-execution-pattern.md` | Fan-out, fan-in, and circuit-breaker rules for `--multi` |
+| Relay prompt templates | `skills/core/routing/references/relay-prompt-templates.md` | Phase 4 and Phase 5 Codex prompt assembly |
+| Completion status protocol | `skills/core/routing/references/completion-status-protocol.md` | Strip terminal status blocks before parsing reconciler or evaluator outputs |
+| Consensus protocol | `skills/core/routing/references/consensus-protocol.md` | Verdict handling for Phase 7 multi-model validation |
+| Divergent techniques | `skills/core/brainstorming/references/divergent-techniques.md` | Structured option generation for `CONFLICT-B` |
+| Upgrade decision template | `templates/core/decision-upgrade.md` | Phase 8 decision-entry contract |
+
+Machine-consumed payloads:
+- Phase 4 writes `.tmp/{SESSION_ID}_upgrade_reconciliation.md`.
+- Each Phase 5 `CONFLICT-A` merge writes `.tmp/{SESSION_ID}_merge_{slug}.md`.
+- Each Phase 5 `CONFLICT-B` option set writes `.tmp/{SESSION_ID}_overlap_{slug}.md`.
+- Phase 7 validation writes `.tmp/{SESSION_ID}_validate_{slug}.json`.
+
+Status-handling rules:
+- Strip trailing status blocks per `skills/core/routing/references/completion-status-protocol.md` before extracting classifications, merged content, or verdicts.
+- Phases 4 and 5 use cherry-pick handling with Claude as the authoritative base and Codex as additive evidence only.
+- Phase 7 uses the verdict rule from `skills/core/routing/references/consensus-protocol.md`. If Codex is missing, fall back to Claude-only validation without reclassifying the file set.
+
 
 ## Branch Summary
 
@@ -121,13 +155,10 @@ For each file in the diff manifest:
 | Deleted + no decision entries | **REMOVAL** |
 | Deleted + decision entries exist | **REMOVAL-GUARDED** |
 
-**Similarity check for CONFLICT-B**:
-For each added upstream file, check if a local component covers the same capability:
-
-- Compare file names across all module directories
-- Compare frontmatter descriptions (if readable)
-- Compare command argument patterns or agent procedure names
-- If >= 2 similarity signals match → CONFLICT-B
+**Similarity pre-screen for `CONFLICT-B`**:
+Use only a lightweight pre-screen in Phase 3.
+If an added upstream file appears capability-adjacent to a local component, classify it provisionally as `CONFLICT-B`.
+Phase 4 reconciler in `agents/core/reconciler.md` performs the authoritative overlap analysis and may confirm or downgrade that provisional class before any merge work starts.
 
 ### Step 3: Summary
 
@@ -163,6 +194,8 @@ Launch the **reconciler** agent via Task tool (Procedure 1: Upgrade Reconciliati
 - **Expected output**: Upgrade Reconciliation Report (validated classifications + resolution strategies)
 
 Parse the report:
+
+Before parsing the reconciler's report, strip the trailing completion status block from `skills/core/routing/references/completion-status-protocol.md` if present.
 
 1. Confirm or adjust classifications based on reconciler's analysis
 2. Extract resolution strategies for each conflict
@@ -205,6 +238,8 @@ For each CONFLICT-B file, apply 1-2 techniques from [divergent-techniques.md](..
 - **Input**: Upstream file + local file + decision entry that created the local file
 - **Instructions**: "Perform Component Merge Analysis for CONFLICT-B. Side-by-side comparison. Produce Overlap Resolution Spec with 3 options (keep local / adopt upstream / merge both) and pros/cons."
 - **Expected output**: Overlap Resolution Spec (3 options with trade-offs)
+
+Before extracting merged content or option lists from any reconciler spec, strip the trailing completion status block from `skills/core/routing/references/completion-status-protocol.md` if present.
 
 ### CONFLICT-A Removal Variants
 
@@ -351,7 +386,7 @@ Log: "Validation complete. {pass}/{total} passed."
 ## Phase 8: Record Decision
 
 Create an upgrade decision entry in the worktree:
-`.worktrees/upgrade-{slug}/docs/decisions/{date}-upgrade-{version-slug}.md`
+`$WORKTREE/docs/decisions/{date}-upgrade-{version-slug}.md`
 
 Use template from `templates/core/decision-upgrade.md`.
 

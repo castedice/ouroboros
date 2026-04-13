@@ -1,0 +1,12 @@
+### {{LEARNING_ID}} — {{TITLE}}
+- category: {{CATEGORY}}
+- confidence: {{CONFIDENCE}}
+- effective_confidence: {{EFFECTIVE_CONFIDENCE}}
+- first_seen: {{FIRST_SEEN}}
+- last_seen: {{LAST_SEEN}}
+- occurrences: {{OCCURRENCES}}
+- independent_tasks: {{INDEPENDENT_TASKS}}
+- decay_weight: {{DECAY_WEIGHT}}
+- source_context: {{SOURCE_CONTEXT}}
+- learning: {{LEARNING}}
+- action: {{ACTION}}

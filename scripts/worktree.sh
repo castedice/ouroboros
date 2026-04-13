@@ -5,7 +5,7 @@
 # generate, evolve, absorb, research, upgrade
 #
 # Usage:
-#   worktree.sh create <operation> <slug>        — create worktree; prints path to stdout
+#   worktree.sh create <operation> <slug>        — create worktree; prints absolute path to stdout
 #   worktree.sh commit <worktree-path> <message>  — stage all + commit in worktree
 #   worktree.sh merge <worktree-path> <message>   — squash merge to main + cleanup
 #   worktree.sh discard <worktree-path>            — force remove worktree + delete branch
@@ -17,7 +17,7 @@
 #
 # Conventions:
 #   branch:   ouroboros/{operation}/{slug}
-#   worktree: .worktrees/{operation}-{slug}
+#   worktree dir: .worktrees/{operation}-{slug}
 #
 # Exit codes:
 #   0 — success
@@ -31,13 +31,18 @@ shift
 
 # ─── Action: create ───
 #   Args: <operation> <slug>
-#   Output: worktree path to stdout
+#   Output: absolute worktree path to stdout
 
 action_create() {
   local operation="${1:?Missing operation}"
   local slug="${2:?Missing slug}"
+  local repo_root
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo "Error: failed to resolve repository root" >&2
+    exit 2
+  }
   local branch="ouroboros/${operation}/${slug}"
-  local worktree=".worktrees/${operation}-${slug}"
+  local worktree="${repo_root}/.worktrees/${operation}-${slug}"
 
   # Auto-prune stale worktrees before creating new one
   action_prune >/dev/null 2>&1 || true
@@ -48,10 +53,10 @@ action_create() {
     ts=$(date +%s)
     slug="${slug}-${ts}"
     branch="ouroboros/${operation}/${slug}"
-    worktree=".worktrees/${operation}-${slug}"
+    worktree="${repo_root}/.worktrees/${operation}-${slug}"
   fi
 
-  mkdir -p .worktrees
+  mkdir -p "${repo_root}/.worktrees"
   if ! git worktree add "$worktree" -b "$branch" HEAD &>/dev/null; then
     echo "Error: failed to create worktree at $worktree" >&2
     exit 2

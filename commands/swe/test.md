@@ -1,5 +1,6 @@
 ---
-description: "Stage 5 — Write tests against interface contracts using TDD Red Phase (TDD)"
+name: swe:test
+description: "Use when you need to write or refine tests from interface contracts before implementation"
 argument-hint: "<task-description> [--fast] [--depth Skip|Light|Standard|Deep] [--artifact <path>]"
 allowed-tools: Read, Glob, Grep, Write, Task, Bash
 ---
@@ -49,18 +50,27 @@ If no Interface Contracts artifact found:
 
 ## Phase 2: Depth Decision
 
-### Conditional Routing
+### Branch Summary
 
-| Condition | Depth | Action |
-|-----------|-------|--------|
-| `--depth` Light/Standard/Deep | As specified | Proceed normally |
-| `--depth Skip` + config-only or docs-only change | Skip | Minimal artifact → Phase 6 |
-| `--depth Skip` + new behavior, changed interfaces, or new error conditions | Light | Override: "Skip not applicable — task changes behavior." |
-| No flags | Scored | Apply depth decision matrix from `depth-system.md` |
-
-Stage-specific depth triggers: Standard when customer-visible behavior changes. Deep when interface has 10+ public methods or complex error hierarchies. Escalation: migration >= 1M rows or flaky-test rate > 2%.
-
-Log: "Depth: {depth} (score: {sum}, factors: S:{n} R:{n} F:{n} T:{n} V:{n})."
+| Condition | Affected Phases | Behavior |
+|-----------|-----------------|----------|
+| `task` is empty | 1 | Abort with the usage error and do not write artifacts. |
+| `--depth` value is invalid | 1 | Abort with the validation error and do not write artifacts. |
+| `--artifact` is provided and readable | 1, 3 | Use that Interface Contracts artifact. |
+| No Interface Contracts artifact can be resolved from `--artifact` or `.swe/active/04-interface.md` | 1, 3 | Abort because Stage 5 requires interface contracts. |
+| `--depth` is provided as Light, Standard, or Deep | 2 | Use the explicit depth and continue. |
+| Explicit `Skip` depth is requested for a config-only or docs-only change | 2, 5, 6 | Take the skip path, write the minimal test artifact, and jump to Phase 6. |
+| Explicit `Skip` depth is requested but behavior, interfaces, or error conditions changed | 2 | Override Skip to Light and continue with normal test generation. |
+| No explicit depth is provided | 2 | Score the task via `skills/swe/methodology/references/depth-system.md` and apply stage triggers. |
+| Optional upstream artifacts exist | 3 | Load them at the depth-appropriate fidelity to enrich scenarios. |
+| Test framework can be detected | 3 | Use the detected framework and conventions for test placement. |
+| Test framework cannot be detected | 3 | Ask the user before generating tests. |
+| Implementer times out or errors | 4 | Retry once with the simplified critical-path fallback prompt, then stop and report the failure. |
+| Test code lacks an inventory table | 4, 5 | Accept the tests and generate the inventory during Phase 5. |
+| Generated tests fail cleanly | 5, 6 | Confirm Red state and write the normal artifact. |
+| Some generated tests pass unexpectedly | 5, 6 | Warn, list the unexpected passes, and still write the artifact. |
+| Test code still has syntax errors after one retry | 5 | Write the tests with the documented error and ask the user for guidance. |
+| Invoked by `/swe dev` | 5, 6 | Skip the Phase 5 review checkpoint and continue directly to the Phase 6 report. |
 
 ## Phase 3: Context Gathering
 
